@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
+import { toast } from "sonner";
 import { api, apiError, wsUrl } from "@/lib/api";
 import * as storage from "@/lib/storage";
+import { pushNotify } from "@/lib/notify";
 
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
@@ -46,7 +48,19 @@ export function AuthProvider({ children }) {
       ws.onmessage = (evt) => {
         try {
           const msg = JSON.parse(evt.data);
-          if (msg.type === "state_updated" || msg.type === "admin_updated") {
+          if (msg.type === "notify") {
+            refresh();
+            window.dispatchEvent(new CustomEvent("xp-refresh", { detail: msg }));
+            if (msg.event === "deposit_confirmed") {
+              const body = `${Number(msg.amount).toLocaleString()} XRP credited to your wallet.`;
+              pushNotify("Deposit confirmed ✅", body);
+              toast.success(body);
+            } else if (msg.event === "withdrawal_approved") {
+              const body = `${Number(msg.amount).toLocaleString()} XRP withdrawal approved.`;
+              pushNotify("Withdrawal approved ✅", body);
+              toast.success(body);
+            }
+          } else if (msg.type === "state_updated" || msg.type === "admin_updated") {
             refresh();
             window.dispatchEvent(new CustomEvent("xp-refresh", { detail: msg }));
           }

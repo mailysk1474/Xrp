@@ -3,10 +3,10 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Logo } from "@/components/Logo";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
-import { Carousel, CarouselContent, CarouselItem } from "@/components/ui/carousel";
 import {
-  ShieldCheck, KeyRound, Zap, Fingerprint, Layers, TrendingUp,
-  Lock, Eye, ArrowRight, Download, Star, CheckCircle2, Wallet, Server,
+  ShieldCheck, KeyRound, Fingerprint, Layers, TrendingUp, Smartphone,
+  Lock, Eye, ArrowRight, Download, CheckCircle2, Wallet, Crown, Clock,
+  LayoutDashboard, ArrowDownToLine, ArrowUpFromLine, Receipt, Sparkles, LockKeyhole,
 } from "lucide-react";
 
 const fadeUp = {
@@ -15,67 +15,126 @@ const fadeUp = {
 };
 
 const FEATURES = [
-  { icon: KeyRound, title: "Self-generated wallet", text: "A fresh 12-word wallet is created for you on sign-up. No email, no password — you hold the keys." },
-  { icon: Fingerprint, title: "PIN & biometric unlock", text: "Your phrase is encrypted on-device behind a PIN. Daily access is one tap." },
-  { icon: TrendingUp, title: "Live yield accrual", text: "Watch profit tick up in real time across every VIP vault, second by second." },
-  { icon: Layers, title: "VIP staking vaults", text: "From flexible XRP Flex to 90-day Diamond at 156% APY — tiered by what you stake." },
-  { icon: ShieldCheck, title: "Server-enforced security", text: "Every action is validated server-side. No client-only gates, no stale balances." },
-  { icon: Zap, title: "Instant admin sync", text: "Account changes propagate live over WebSocket. What you see is always the source of truth." },
+  { icon: KeyRound, title: "Self-generated wallet", text: "A fresh 12-word wallet is created for you on sign-up. No email, no password — you hold the keys, always." },
+  { icon: Fingerprint, title: "PIN & biometric unlock", text: "Your recovery phrase is encrypted on your device behind a PIN. Daily access is a single, secure tap." },
+  { icon: TrendingUp, title: "Live yield accrual", text: "Watch your profit tick up in real time across every VIP vault — second by second, never static." },
+  { icon: Layers, title: "VIP staking vaults", text: "From flexible XRP Flex to the 90-day Diamond vault at 156% APY — rewards scale with your tier." },
+  { icon: LockKeyhole, title: "Bank-grade encryption", text: "Your keys are protected with AES-256 encryption and never leave your device in the clear." },
+  { icon: Smartphone, title: "Install like an app", text: "Add XamanProtocol to your home screen and open it full-screen like a native mobile wallet." },
+];
+
+const STATS = [
+  { value: "156%", label: "Max APY" },
+  { value: "5", label: "VIP Vaults" },
+  { value: "24/7", label: "Live Yield" },
+  { value: "AES-256", label: "Encryption" },
 ];
 
 const STEPS = [
-  { icon: Wallet, title: "Create your wallet", text: "Register with a unique username and save your 12-word recovery phrase." },
-  { icon: Fingerprint, title: "Set a PIN", text: "Encrypt your phrase locally and unlock instantly on every visit." },
-  { icon: Layers, title: "Stake into a vault", text: "Deposit XRP and choose a VIP vault matched to your tier." },
-  { icon: TrendingUp, title: "Earn live yield", text: "Profit accrues continuously and is withdrawable at maturity." },
+  { icon: Wallet, title: "Create your wallet", text: "Register with a unique username and save your 12-word recovery phrase — it's shown only once." },
+  { icon: Fingerprint, title: "Set a PIN", text: "Encrypt your phrase locally and unlock instantly every time you return." },
+  { icon: Layers, title: "Stake into a vault", text: "Deposit XRP and choose a VIP vault matched to your tier and time horizon." },
+  { icon: TrendingUp, title: "Earn live yield", text: "Profit accrues continuously and becomes withdrawable at maturity." },
 ];
 
-const TESTIMONIALS = [
-  { name: "M. Serrano", role: "Platinum member", text: "The live accrual counter is addictive. It finally feels like my capital is working every second." },
-  { name: "A. Okafor", role: "Diamond member", text: "Setup took under a minute. The self-custody model with a PIN is exactly how a wallet should feel." },
-  { name: "L. Petrova", role: "Gold member", text: "Clean, fast, and the security-first approach is obvious. Withdrawals were approved same day." },
-  { name: "R. Nakamura", role: "Silver member", text: "Installed it to my home screen and never looked back. Feels like a real native app." },
+const SECURITY = [
+  { icon: KeyRound, title: "You own the keys", text: "A 12-word recovery phrase is generated on your device — no custodian ever holds your login." },
+  { icon: LockKeyhole, title: "Encrypted on-device", text: "Your phrase is sealed with AES-256 behind your PIN and never stored in plain text." },
+  { icon: Fingerprint, title: "PIN & biometric access", text: "Unlock with a passcode or your device's fingerprint / Face ID for daily convenience." },
+  { icon: ShieldCheck, title: "No email, no password", text: "Nothing to phish, nothing to leak. Recovery on any device uses only your phrase." },
 ];
 
 const FAQS = [
-  { q: "Is XamanProtocol custodial?", a: "Your 12-word phrase is your wallet identity and never leaves your device unencrypted. Staking balances are platform-managed off-chain numbers, confirmed by our team." },
+  { q: "Is XamanProtocol custodial?", a: "Your 12-word phrase is your wallet identity and never leaves your device unencrypted. Staking balances are platform-managed figures, confirmed by our team when you deposit." },
   { q: "What happens if I lose my recovery phrase?", a: "There is no recovery. The phrase is the only way to access your wallet — store it offline and never share it. This is by design for a security-first, non-custodial model." },
-  { q: "How is my profit calculated?", a: "Each vault has a fixed APY. Profit accrues continuously by the second based on your staked principal and is shown live on your dashboard." },
-  { q: "How do deposits and withdrawals work?", a: "Deposit XRP to your unique address with a destination tag; balances credit after admin confirmation. Withdrawals are requested in-app and manually approved." },
+  { q: "How is my profit calculated?", a: "Each vault has a fixed APY. Profit accrues continuously by the second based on your staked amount and is shown live on your dashboard." },
+  { q: "How do deposits and withdrawals work?", a: "Deposit XRP to your unique address with a destination tag; your balance is credited once the deposit is confirmed. Withdrawals are requested in-app and approved before payout." },
   { q: "Which coins are supported?", a: "XamanProtocol is XRP-first. Additional assets can be added by the protocol over time." },
+  { q: "Do I need to install anything?", a: "No — it runs in your browser. For the best experience you can add it to your home screen and launch it full-screen like a native app." },
 ];
 
+/* Faithful mini version of the real user dashboard */
 function PhoneMock() {
   return (
-    <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: "easeOut" }} className="relative mx-auto w-[270px] animate-float">
-      <div className="rounded-[2.6rem] border-[6px] border-slate-900 bg-slate-900 p-1.5 shadow-2xl" style={{ boxShadow: "0 30px 60px -20px rgba(37,99,235,0.35)" }}>
-        <div className="rounded-[2rem] overflow-hidden bg-[#F7F9FC] border border-slate-200">
-          <div className="h-6 bg-white flex items-center justify-center border-b border-slate-100"><div className="w-16 h-1.5 rounded-full bg-slate-200" /></div>
-          <div className="p-4 space-y-3">
+    <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: "easeOut" }} className="relative mx-auto w-[300px] animate-float">
+      <div className="rounded-[2.8rem] border-[7px] border-slate-900 bg-slate-900 p-1.5 shadow-2xl" style={{ boxShadow: "0 40px 80px -24px rgba(37,99,235,0.4)" }}>
+        <div className="rounded-[2.1rem] overflow-hidden bg-[#F7F9FC] border border-slate-200">
+          {/* status + top bar */}
+          <div className="bg-white border-b border-slate-100">
+            <div className="h-5 flex items-center justify-center"><div className="w-16 h-1 rounded-full bg-slate-200" /></div>
+            <div className="flex items-center justify-between px-3.5 pb-2.5">
+              <div className="flex items-center gap-1.5">
+                <img src="/icon-512.png" alt="" className="w-5 h-5 rounded-md" />
+                <span className="text-[11px] font-bold text-slate-900">Xaman<span className="text-blue-600">Protocol</span></span>
+              </div>
+              <div className="flex items-center gap-1 text-[8px] text-slate-500 border border-slate-200 rounded-md px-1.5 py-0.5"><Lock size={8} /> Lock</div>
+            </div>
+          </div>
+
+          <div className="p-3.5 space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-[9px] text-slate-400 uppercase tracking-wider">Balance</p>
-              <span className="text-[9px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200">Diamond</span>
+              <div>
+                <p className="text-[8px] text-slate-400">Welcome back,</p>
+                <p className="text-[12px] font-bold text-slate-900 leading-tight">Ada Lovelace</p>
+              </div>
+              <span className="flex items-center gap-1 text-[8px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200"><Crown size={8} /> Diamond</span>
             </div>
-            <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 p-4">
-              <p className="font-mono text-2xl font-bold text-white">128,450.<span className="text-blue-200 text-lg">00</span></p>
-              <p className="text-[10px] text-blue-200 font-semibold">XRP</p>
-              <div className="flex items-center gap-1.5 mt-2 text-[10px]">
-                <TrendingUp size={11} className="text-emerald-300" />
-                <span className="font-mono text-white">+312.884201</span>
-                <span className="text-blue-200">live</span>
+
+            {/* balance hero */}
+            <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 p-3.5">
+              <p className="text-[8px] text-blue-100 uppercase tracking-wider">Available Balance</p>
+              <p className="font-mono text-[22px] font-bold text-white leading-tight mt-0.5">128,450.<span className="text-blue-200 text-base">00</span> <span className="text-[10px] text-blue-200">XRP</span></p>
+              <div className="flex items-center gap-1 mt-1 text-[9px]">
+                <TrendingUp size={9} className="text-emerald-300" />
+                <span className="text-blue-100">Live yield</span>
+                <span className="font-mono text-white">312.884201</span>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5 mt-2.5">
+                <div className="bg-white rounded-lg text-center py-1.5 text-blue-700 text-[9px] font-semibold">Deposit</div>
+                <div className="bg-blue-500/40 border border-white/30 rounded-lg text-center py-1.5 text-white text-[9px] font-semibold">Withdraw</div>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-xl bg-white border border-slate-200 p-3">
-                <p className="text-[8px] text-slate-400 uppercase">Diamond</p>
-                <p className="font-mono text-purple-600 font-bold text-sm">156% APY</p>
+
+            {/* stat cards */}
+            <div className="grid grid-cols-3 gap-1.5">
+              <div className="bg-white border border-slate-200 rounded-xl p-2">
+                <p className="text-[7px] text-slate-400 uppercase">Staked</p>
+                <p className="font-mono text-[11px] font-bold text-slate-900">100k</p>
               </div>
-              <div className="rounded-xl bg-white border border-slate-200 p-3">
-                <p className="text-[8px] text-slate-400 uppercase">Gold</p>
-                <p className="font-mono text-amber-600 font-bold text-sm">38.4% APY</p>
+              <div className="bg-white border border-slate-200 rounded-xl p-2">
+                <p className="text-[7px] text-slate-400 uppercase">Profit</p>
+                <p className="font-mono text-[11px] font-bold text-emerald-600">312.8</p>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-xl p-2">
+                <p className="text-[7px] text-slate-400 uppercase">Vaults</p>
+                <p className="font-mono text-[11px] font-bold text-slate-900">2</p>
               </div>
             </div>
-            <div className="rounded-xl bg-blue-600 text-center py-2.5 text-white text-[11px] font-semibold">Deposit XRP</div>
+
+            {/* active stake */}
+            <div className="bg-white border border-slate-200 rounded-xl p-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-6 h-6 rounded-lg bg-purple-100 flex items-center justify-center"><Layers size={11} className="text-purple-600" /></div>
+                  <div>
+                    <p className="text-[10px] font-semibold text-slate-900 leading-none">VIP Diamond</p>
+                    <p className="text-[8px] text-slate-400 font-mono">156% APY · 90d lock</p>
+                  </div>
+                </div>
+                <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200">Active</span>
+              </div>
+              <div className="flex items-center justify-between mt-2 px-2 py-1 rounded-lg bg-blue-50 border border-blue-100">
+                <span className="text-[8px] text-slate-500 flex items-center gap-1"><Clock size={8} /> Unlocks in</span>
+                <span className="font-mono text-[9px] font-semibold text-blue-600">62d 4h 11m</span>
+              </div>
+            </div>
+          </div>
+
+          {/* bottom nav */}
+          <div className="grid grid-cols-5 border-t border-slate-200 bg-white/95">
+            {[{ i: LayoutDashboard, a: true }, { i: Layers }, { i: ArrowDownToLine }, { i: ArrowUpFromLine }, { i: Receipt }].map((n, k) => (
+              <div key={k} className={`flex justify-center py-2 ${n.a ? "text-blue-600" : "text-slate-300"}`}><n.i size={15} /></div>
+            ))}
           </div>
         </div>
       </div>
@@ -101,6 +160,7 @@ export default function Landing() {
             <a href="#features" className="hover:text-slate-900 transition-colors">Features</a>
             <a href="#how" className="hover:text-slate-900 transition-colors">How it works</a>
             <a href="#vaults" className="hover:text-slate-900 transition-colors">Vaults</a>
+            <a href="#security" className="hover:text-slate-900 transition-colors">Security</a>
             <Link to="/whitepaper" data-testid="nav-whitepaper" className="hover:text-slate-900 transition-colors">Whitepaper</Link>
           </nav>
           <Link to="/create" data-testid="nav-get-started" className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-xl glow-blue transition-all active:scale-95">
@@ -140,18 +200,13 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Trust band */}
+      {/* Stats band */}
       <section className="border-y border-slate-200 bg-[#F7F9FC]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-          {[
-            { icon: ShieldCheck, label: "Audited protocol" },
-            { icon: Server, label: "Server-enforced" },
-            { icon: Lock, label: "AES-256 encrypted" },
-            { icon: KeyRound, label: "Non-custodial keys" },
-          ].map((t, i) => (
-            <motion.div key={i} variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} custom={i} className="flex flex-col items-center gap-2">
-              <t.icon size={22} className="text-blue-600" />
-              <span className="text-sm font-medium text-slate-700">{t.label}</span>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid grid-cols-2 md:grid-cols-4 gap-6">
+          {STATS.map((s, i) => (
+            <motion.div key={i} variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} custom={i} className="text-center">
+              <p className="text-3xl sm:text-4xl font-bold font-mono text-blue-600 tabular-nums">{s.value}</p>
+              <p className="text-sm text-slate-500 mt-1">{s.label}</p>
             </motion.div>
           ))}
         </div>
@@ -161,7 +216,8 @@ export default function Landing() {
       <section id="features" className="max-w-6xl mx-auto px-4 sm:px-6 py-20 sm:py-28">
         <div className="max-w-2xl">
           <p className="text-xs font-semibold uppercase tracking-[0.15em] text-blue-600">Why XamanProtocol</p>
-          <h2 className="text-3xl sm:text-4xl font-bold mt-3 text-slate-900">Security-first by design, effortless to use.</h2>
+          <h2 className="text-3xl sm:text-4xl font-bold mt-3 text-slate-900">Everything a VIP wallet should be.</h2>
+          <p className="text-slate-500 mt-4 leading-relaxed">Built for members who want the sovereignty of self-custody with the simplicity of a modern app — and yield that works around the clock.</p>
         </div>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mt-12">
           {FEATURES.map((f, i) => (
@@ -183,23 +239,24 @@ export default function Landing() {
           <div className="relative grid lg:grid-cols-2 gap-10 items-center">
             <div>
               <h2 className="text-3xl sm:text-4xl font-bold text-white">Up to <span className="text-cyan-200">156% APY</span> across VIP vaults.</h2>
-              <p className="text-blue-100 mt-4 leading-relaxed">Tiered vaults reward commitment — from flexible XRP Flex to the 90-day Diamond vault. Your VIP tier unlocks as you stake more.</p>
+              <p className="text-blue-100 mt-4 leading-relaxed">Tiered vaults reward commitment — from flexible XRP Flex to the 90-day Diamond vault. Your VIP tier unlocks automatically as you stake more.</p>
               <Link to="/create" className="inline-flex items-center gap-2 mt-6 bg-white text-blue-700 hover:bg-blue-50 font-semibold px-6 py-3 rounded-xl transition-all active:scale-95">
                 Start staking <ArrowRight size={16} />
               </Link>
             </div>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { n: "XRP Flex", a: "5.2%" },
-                { n: "VIP Silver", a: "19.2%" },
-                { n: "VIP Gold", a: "38.4%" },
-                { n: "VIP Platinum", a: "83.6%" },
-                { n: "VIP Diamond", a: "156%" },
-                { n: "Live accrual", a: "24/7" },
+                { n: "XRP Flex", a: "5.2%", t: "Flexible" },
+                { n: "VIP Silver", a: "19.2%", t: "30 days" },
+                { n: "VIP Gold", a: "38.4%", t: "45 days" },
+                { n: "VIP Platinum", a: "83.6%", t: "60 days" },
+                { n: "VIP Diamond", a: "156%", t: "90 days" },
+                { n: "Live accrual", a: "24/7", t: "Every second" },
               ].map((v, i) => (
                 <div key={i} className="bg-white/10 backdrop-blur border border-white/20 rounded-xl p-4">
                   <p className="text-xs text-blue-100">{v.n}</p>
                   <p className="font-mono font-bold text-xl mt-1 text-white">{v.a}</p>
+                  <p className="text-[10px] text-blue-200 mt-0.5">{v.t}</p>
                 </div>
               ))}
             </div>
@@ -227,30 +284,28 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section className="border-y border-slate-200 bg-[#F7F9FC] py-20">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <h2 className="text-3xl sm:text-4xl font-bold text-center text-slate-900">Trusted by VIP members.</h2>
-          <Carousel opts={{ loop: true, align: "start" }} className="mt-12">
-            <CarouselContent>
-              {TESTIMONIALS.map((t, i) => (
-                <CarouselItem key={i} className="md:basis-1/2 lg:basis-1/3">
-                  <div className="h-full bg-white border border-slate-200 rounded-2xl p-6 shadow-sm" data-testid={`testimonial-${i}`}>
-                    <div className="flex gap-0.5 mb-3">{Array.from({ length: 5 }).map((_, k) => <Star key={k} size={14} className="fill-amber-400 text-amber-400" />)}</div>
-                    <p className="text-slate-600 leading-relaxed text-sm">"{t.text}"</p>
-                    <div className="mt-4 pt-4 border-t border-slate-100">
-                      <p className="font-semibold text-slate-900 text-sm">{t.name}</p>
-                      <p className="text-xs text-blue-600">{t.role}</p>
-                    </div>
-                  </div>
-                </CarouselItem>
-              ))}
-            </CarouselContent>
-          </Carousel>
+      {/* Security section */}
+      <section id="security" className="border-y border-slate-200 bg-[#F7F9FC] py-20 sm:py-28">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 grid lg:grid-cols-2 gap-12 items-center">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-blue-600">Security first</p>
+            <h2 className="text-3xl sm:text-4xl font-bold mt-3 text-slate-900">Your keys. Your crypto. Uncompromised.</h2>
+            <p className="text-slate-500 mt-4 leading-relaxed">XamanProtocol is built on a simple principle: only you should be able to access your wallet. There's no password to steal and no account to hijack — just a phrase that lives with you.</p>
+            <Link to="/whitepaper" className="inline-flex items-center gap-2 mt-6 text-blue-600 font-semibold hover:underline">Read the whitepaper <ArrowRight size={16} /></Link>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-4">
+            {SECURITY.map((s, i) => (
+              <motion.div key={i} variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} custom={i} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                <s.icon size={20} className="text-blue-600 mb-3" />
+                <h3 className="font-semibold text-slate-900 text-sm">{s.title}</h3>
+                <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{s.text}</p>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* Self custody */}
+      {/* Self custody CTA */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-20 sm:py-28 text-center">
         <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
           <Eye className="mx-auto text-blue-600 mb-5" size={34} />
@@ -294,6 +349,7 @@ export default function Landing() {
             <Link to="/whitepaper" className="hover:text-slate-900">Whitepaper</Link>
             <a href="#features" className="hover:text-slate-900">Features</a>
             <a href="#vaults" className="hover:text-slate-900">Vaults</a>
+            <a href="#security" className="hover:text-slate-900">Security</a>
           </div>
           <p className="text-xs text-slate-400">© {new Date().getFullYear()} XamanProtocol. Non-custodial. XRP-first.</p>
         </div>

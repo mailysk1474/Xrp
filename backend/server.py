@@ -653,7 +653,8 @@ async def admin_confirm_deposit(txn_id: str, admin: dict = Depends(require_admin
     await db.transactions.update_one({"_id": ObjectId(txn_id)}, {"$set": {"status": "completed", "meta.confirmed_by": admin["username"]}})
     await db.users.update_one({"_id": ObjectId(t["user_id"])}, {"$inc": {"balance": t["amount"]}})
     await audit(admin, "confirm_deposit", t["user_id"], {"amount": t["amount"], "txn": txn_id})
-    await _notify_change(t["user_id"])
+    await manager.notify_user(t["user_id"], {"type": "notify", "event": "deposit_confirmed", "amount": t["amount"]})
+    await manager.notify_admins()
     return {"ok": True}
 
 
@@ -677,7 +678,8 @@ async def admin_approve_withdrawal(txn_id: str, admin: dict = Depends(require_ad
         return {"ok": True, "note": "already processed"}
     await db.transactions.update_one({"_id": ObjectId(txn_id)}, {"$set": {"status": "completed", "meta.approved_by": admin["username"]}})
     await audit(admin, "approve_withdrawal", t["user_id"], {"amount": t["amount"], "txn": txn_id})
-    await _notify_change(t["user_id"])
+    await manager.notify_user(t["user_id"], {"type": "notify", "event": "withdrawal_approved", "amount": t["amount"]})
+    await manager.notify_admins()
     return {"ok": True}
 
 

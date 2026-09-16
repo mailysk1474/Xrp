@@ -1,6 +1,9 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { LiveProfit } from "@/components/LiveProfit";
+import { Countdown } from "@/components/Countdown";
+import { ensureNotifyPermission } from "@/lib/notify";
 import { fmtXRP, TIER_META } from "@/lib/format";
 import { motion } from "framer-motion";
 import {
@@ -28,6 +31,10 @@ function StatCard({ icon: Icon, label, children, accent = "#2563EB", testid, del
 export default function Dashboard() {
   const { serverState, user, serverOffset } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    ensureNotifyPermission();
+  }, []);
 
   if (!serverState) {
     return (
@@ -162,6 +169,12 @@ export default function Dashboard() {
                       <p className="font-semibold text-emerald-600"><LiveProfit stakes={[st]} offsetRef={serverOffset} className="text-emerald-600" /> <span className="text-xs text-slate-400">XRP</span></p>
                     </div>
                   </div>
+                  {st.duration_days > 0 && st.status !== "matured" && (
+                    <div className="flex items-center justify-between mt-3 px-3 py-2 rounded-xl bg-blue-50 border border-blue-100">
+                      <span className="text-xs text-slate-500 flex items-center gap-1.5"><Clock size={12} /> Unlocks in</span>
+                      <Countdown target={st.matures_at} offsetRef={serverOffset} className="font-mono text-sm font-semibold text-blue-600 tabular-nums" testid={`countdown-${st.id}`} />
+                    </div>
+                  )}
                 </div>
               );
             })}

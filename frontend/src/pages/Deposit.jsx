@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "@/context/AuthContext";
 import { api, apiError } from "@/lib/api";
 import { Copy, Check, Info, Loader2, ArrowDownToLine } from "lucide-react";
@@ -64,6 +65,18 @@ export default function Deposit() {
         <div className="flex items-center gap-2 text-slate-900 font-semibold"><ArrowDownToLine size={18} className="text-blue-600" /> Your XRP deposit details</div>
         {info ? (
           <>
+            <div className="flex flex-col items-center gap-3 py-2" data-testid="deposit-qr">
+              <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
+                <QRCodeSVG
+                  value={`${info.address}?dt=${info.destination_tag}`}
+                  size={168}
+                  level="M"
+                  fgColor="#0F172A"
+                  bgColor="#FFFFFF"
+                />
+              </div>
+              <p className="text-xs text-slate-400">Scan to send XRP (includes destination tag)</p>
+            </div>
             <CopyRow label="Hot Wallet Address" value={info.address} testid="deposit-address" />
             <CopyRow label="Destination Tag (required)" value={info.destination_tag} testid="deposit-tag" />
           </>
