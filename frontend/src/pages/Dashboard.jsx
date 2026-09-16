@@ -1,15 +1,83 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+import { api, apiError } from "@/lib/api";
 import { LiveProfit } from "@/components/LiveProfit";
 import { Countdown } from "@/components/Countdown";
 import { ensureNotifyPermission } from "@/lib/notify";
 import { fmtXRP, TIER_META } from "@/lib/format";
 import { motion } from "framer-motion";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   TrendingUp, Layers, ArrowDownToLine, ArrowUpFromLine,
-  Lock, Crown, Sparkles, Clock,
+  Lock, Crown, Sparkles, Clock, Repeat, Loader2,
 } from "lucide-react";
+
+function ReinvestDialog({ open, onClose, profit, onDone }) {
+  const [vaults, setVaults] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    api.get("/vaults").then(({ data }) => {
+      setVaults(data.vaults);
+      setSelected(data.vaults.find((v) => v.key === "xrp_flex") || data.vaults[0]);
+    }).catch(() => {});
+  }, [open]);
+
+  const confirm = async () => {
+    if (!selected) return;
+    setBusy(true);
+    try {
+      const { data } = await api.post("/reinvest", { vault_key: selected.key });
+      toast.success(`Reinvested ${fmtXRP(data.amount)} XRP into ${selected.name}.`);
+      onDone();
+      onClose();
+    } catch (err) {
+      toast.error(apiError(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="bg-white border-slate-200 text-slate-900 max-w-md" data-testid="reinvest-dialog">
+        <DialogHeader><DialogTitle className="text-xl">Reinvest your profit</DialogTitle></DialogHeader>
+        <div className="space-y-4">
+          <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 p-5 text-white">
+            <p className="text-xs text-blue-100 uppercase tracking-wider">Available profit</p>
+            <p className="font-mono text-3xl font-bold mt-1 tabular-nums" data-testid="reinvest-amount">{fmtXRP(profit)} <span className="text-sm text-blue-200">XRP</span></p>
+            <p className="text-xs text-blue-200 mt-1">Compounds into a fresh stake — no new deposit needed.</p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-blue-600 mb-2">Choose a vault</p>
+            <div className="flex flex-wrap gap-2">
+              {vaults.map((v) => {
+                const ok = profit >= (v.min_amount || 0);
+                return (
+                  <button key={v.key} disabled={!ok} onClick={() => setSelected(v)} data-testid={`reinvest-vault-${v.key}`}
+                    className={`px-3 py-2 rounded-xl text-sm font-semibold border transition-all disabled:opacity-40 ${selected?.key === v.key ? "bg-blue-600 text-white border-blue-600" : "bg-white text-slate-600 border-slate-200 hover:border-blue-300"}`}>
+                    {v.name} · {(v.apy * 100).toFixed(1)}%
+                  </button>
+                );
+              })}
+            </div>
+            {selected && profit < (selected.min_amount || 0) && (
+              <p className="text-xs text-amber-600 mt-2">Needs {fmtXRP(selected.min_amount, 0)} XRP profit for this vault.</p>
+            )}
+          </div>
+          <button onClick={confirm} disabled={busy || !selected || profit <= 0} data-testid="confirm-reinvest-button"
+            className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold py-3 rounded-xl glow-blue transition-all">
+            {busy ? <Loader2 className="animate-spin" size={18} /> : <><Repeat size={16} /> Reinvest now</>}
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function StatCard({ icon: Icon, label, children, accent = "#2563EB", testid, delay = 0 }) {
   return (
@@ -29,8 +97,9 @@ function StatCard({ icon: Icon, label, children, accent = "#2563EB", testid, del
 }
 
 export default function Dashboard() {
-  const { serverState, user, serverOffset } = useAuth();
+  const { serverState, user, serverOffset, refresh } = useAuth();
   const navigate = useNavigate();
+  const [reinvestOpen, setReinvestOpen] = useState(false);
 
   useEffect(() => {
     ensureNotifyPermission();
@@ -108,6 +177,11 @@ export default function Dashboard() {
           <p className="text-2xl font-bold font-mono tabular-nums text-emerald-600">
             <LiveProfit stakes={activeStakes} bonus={s.bonus_profit} offsetRef={serverOffset} /> <span className="text-sm text-slate-400">XRP</span>
           </p>
+          {s.profit > 0 && (
+            <button onClick={() => setReinvestOpen(true)} data-testid="reinvest-button" className="mt-2.5 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg px-3 py-1.5 transition-colors">
+              <Repeat size={13} /> Reinvest profit
+            </button>
+          )}
         </StatCard>
         <StatCard icon={Crown} label="Active Vaults" accent={tier.color} testid="stat-active-vaults" delay={0.15}>
           <p className="text-2xl font-bold text-slate-900 font-mono tabular-nums">{activeStakes.length}</p>
@@ -181,6 +255,8 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      <ReinvestDialog open={reinvestOpen} onClose={() => setReinvestOpen(false)} profit={s.profit} onDone={refresh} />
     </div>
   );
 }

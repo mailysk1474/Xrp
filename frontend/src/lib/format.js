@@ -42,5 +42,7 @@ export function liveAccrued(stake, serverOffsetMs = 0) {
   if (elapsed < 0) elapsed = 0;
   const dur = stake.duration_days || 0;
   if (dur > 0) elapsed = Math.min(elapsed, dur * 86400);
-  return (stake.principal * stake.apy * elapsed) / (365 * 24 * 3600);
+  const gross = (stake.principal * stake.apy * elapsed) / (365 * 24 * 3600);
+  const net = gross - (stake.claimed_profit || 0);
+  return net > 0 ? net : 0;
 }

@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { api, apiError } from "@/lib/api";
 import { fmtXRP, TIER_META } from "@/lib/format";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Layers, Lock, Zap, TrendingUp, Loader2 } from "lucide-react";
+import { Layers, Lock, Zap, TrendingUp, Loader2, BarChart3 } from "lucide-react";
 
 export default function VaultsPage() {
   const { serverState, refresh } = useAuth();
@@ -13,6 +13,8 @@ export default function VaultsPage() {
   const [selected, setSelected] = useState(null);
   const [amount, setAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [showCompare, setShowCompare] = useState(false);
+  const [compareAmount, setCompareAmount] = useState(1000);
 
   useEffect(() => {
     api.get("/vaults").then(({ data }) => setVaults(data.vaults)).catch(() => {});
@@ -47,10 +49,60 @@ export default function VaultsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Vaults</h1>
-        <p className="text-sm text-slate-500 mt-1">Available balance: <span className="text-slate-900 font-mono font-semibold">{fmtXRP(balance)} XRP</span></p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Vaults</h1>
+          <p className="text-sm text-slate-500 mt-1">Available balance: <span className="text-slate-900 font-mono font-semibold">{fmtXRP(balance)} XRP</span></p>
+        </div>
+        <button onClick={() => setShowCompare((v) => !v)} data-testid="compare-toggle" className="flex items-center gap-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 font-semibold px-4 py-2.5 rounded-xl transition-colors">
+          <BarChart3 size={16} /> {showCompare ? "Hide comparison" : "Compare vaults"}
+        </button>
       </div>
+
+      {showCompare && (
+        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} data-testid="compare-panel" className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+            <h2 className="font-semibold text-slate-900">Vault comparison</h2>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-slate-500">Amount</span>
+              <input type="number" value={compareAmount} onChange={(e) => setCompareAmount(Math.max(0, parseFloat(e.target.value) || 0))} data-testid="compare-amount" className="w-32 bg-slate-50 border border-slate-300 focus:border-blue-500 rounded-lg px-3 py-1.5 font-mono outline-none" />
+              <span className="text-slate-500">XRP</span>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[640px]">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wider text-slate-400 border-b border-slate-100">
+                  <th className="py-2 pr-4 font-semibold">Vault</th>
+                  <th className="py-2 px-4 font-semibold">APY</th>
+                  <th className="py-2 px-4 font-semibold">Lock</th>
+                  <th className="py-2 px-4 font-semibold">Min stake</th>
+                  <th className="py-2 px-4 font-semibold">Yield at maturity</th>
+                  <th className="py-2 pl-4 font-semibold">Annualized</th>
+                </tr>
+              </thead>
+              <tbody>
+                {vaults.map((v) => {
+                  const meta = TIER_META[v.tier] || TIER_META.flex;
+                  const perYear = compareAmount * v.apy;
+                  const termYield = v.duration_days ? perYear * (v.duration_days / 365) : perYear;
+                  return (
+                    <tr key={v.key} className="border-b border-slate-50 last:border-0" data-testid={`compare-row-${v.key}`}>
+                      <td className="py-3 pr-4 font-semibold text-slate-900"><span className="inline-block w-2 h-2 rounded-full mr-2 align-middle" style={{ background: meta.color }} />{v.name}</td>
+                      <td className="py-3 px-4 font-mono font-bold" style={{ color: meta.color }}>{(v.apy * 100).toFixed(1)}%</td>
+                      <td className="py-3 px-4 text-slate-600">{v.duration_days ? `${v.duration_days} days` : "Flexible"}</td>
+                      <td className="py-3 px-4 font-mono text-slate-600">{fmtXRP(v.min_amount, 0)}</td>
+                      <td className="py-3 px-4 font-mono text-emerald-600">+{fmtXRP(termYield)}</td>
+                      <td className="py-3 pl-4 font-mono text-slate-600">+{fmtXRP(perYear)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-slate-400 mt-3">Illustrative projections based on each vault's fixed APY. "Yield at maturity" reflects the lock term; flexible vaults show one year.</p>
+        </motion.div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5" data-testid="vaults-grid">
         {vaults.map((v, i) => {

@@ -232,6 +232,10 @@ def stake_matured(stake: dict, now: datetime) -> bool:
 
 
 def serialize_stake(stake: dict, now: datetime) -> dict:
+    claimed = stake.get("claimed_profit", 0.0)
+    net = stake_accrued(stake, now) - claimed
+    if net < 0:
+        net = 0.0
     return {
         "id": str(stake["_id"]),
         "vault_key": stake["vault_key"],
@@ -243,7 +247,8 @@ def serialize_stake(stake: dict, now: datetime) -> dict:
         "matures_at": (parse_iso(stake["start_at"]) + timedelta(days=stake.get("duration_days", 0))).isoformat()
         if stake.get("duration_days", 0) else None,
         "status": "matured" if stake_matured(stake, now) else "active",
-        "accrued": round(stake_accrued(stake, now), 6),
+        "accrued": round(net, 6),
+        "claimed_profit": round(claimed, 6),
         "tier": stake.get("tier", "flex"),
     }
 
@@ -355,6 +360,10 @@ class LoginReq(BaseModel):
 class StakeReq(BaseModel):
     vault_key: str
     amount: float
+
+
+class ReinvestReq(BaseModel):
+    vault_key: str
 
 
 class AmountReq(BaseModel):
@@ -496,6 +505,50 @@ async def create_stake(body: StakeReq, user: dict = Depends(require_active_user)
     await manager.notify_user(str(user["_id"]))
     await manager.notify_admins()
     return {"ok": True}
+
+
+@api.post("/reinvest")
+async def reinvest(body: ReinvestReq, user: dict = Depends(require_active_user)):
+    vault = await db.vaults.find_one({"key": body.vault_key})
+    if not vault or not vault.get("enabled", True):
+        raise HTTPException(status_code=404, detail="Vault not available.")
+    now = datetime.now(timezone.utc)
+    fresh = await db.users.find_one({"_id": user["_id"]})
+    stakes = await db.stakes.find({"user_id": str(user["_id"])}).to_list(500)
+    total = round(fresh.get("bonus_profit", 0.0), 6)
+    to_claim = []
+    for s in stakes:
+        acc = stake_accrued(s, now)
+        net = acc - s.get("claimed_profit", 0.0)
+        if net > 0:
+            total += net
+            to_claim.append((s["_id"], acc))
+    total = round(total, 6)
+    if total <= 0:
+        raise HTTPException(status_code=400, detail="You have no profit to reinvest yet.")
+    if total < vault.get("min_amount", 0):
+        raise HTTPException(status_code=400, detail=f"You need at least {vault['min_amount']} XRP of profit to reinvest into {vault['name']}.")
+    for sid, acc in to_claim:
+        await db.stakes.update_one({"_id": sid}, {"$set": {"claimed_profit": round(acc, 6)}})
+    await db.users.update_one({"_id": user["_id"]}, {"$set": {"bonus_profit": 0.0}})
+    stake_doc = {
+        "user_id": str(user["_id"]),
+        "vault_key": vault["key"],
+        "vault_name": vault["name"],
+        "principal": total,
+        "apy": vault["apy"],
+        "duration_days": vault.get("duration_days", 0),
+        "tier": vault.get("tier", "flex"),
+        "claimed_profit": 0.0,
+        "start_at": now_iso(),
+        "created_at": now_iso(),
+    }
+    sid = await db.stakes.insert_one(stake_doc)
+    await add_transaction(user["_id"], "reinvest", total, "completed",
+                          {"vault": vault["name"], "stake_id": str(sid.inserted_id)})
+    await manager.notify_user(str(user["_id"]))
+    await manager.notify_admins()
+    return {"ok": True, "amount": total}
 
 
 @api.post("/deposit-claim")
