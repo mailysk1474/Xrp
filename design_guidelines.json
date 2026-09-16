@@ -1,0 +1,179 @@
+{
+  "project_name": "XamanProtocol",
+  "archetype": "THE PERFORMANCE PRO & LUXURY TECH",
+  "theme": "Dark, premium, security-first fintech",
+  "context_type": "hybrid_fullstack (PWA staking app + marketing landing page)",
+  "file_type_note": "Frontend uses .js and .jsx files (JavaScript / React)",
+  "typography": {
+    "heading_font": "Satoshi, Plus Jakarta Sans, sans-serif",
+    "body_font": "Plus Jakarta Sans, sans-serif",
+    "mono_font": "JetBrains Mono, monospace",
+    "font_sources": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&family=JetBrains+Mono:wght@400;500;700&display=swap",
+    "font_pairing_strategy": "Satoshi/Plus Jakarta Sans for ultra-clean, high-density fintech clarity paired with JetBrains Mono for monetary values, wallet addresses, APYs, and transaction hashes.",
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-tight",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-white",
+      "h3": "text-xl sm:text-2xl font-medium tracking-normal text-slate-100",
+      "h4": "text-lg sm:text-xl font-medium text-slate-200",
+      "body_large": "text-lg text-slate-300 leading-relaxed",
+      "body": "text-base text-slate-400 leading-normal",
+      "body_small": "text-sm text-slate-400",
+      "label": "text-xs font-semibold uppercase tracking-[0.15em] text-blue-400/90",
+      "crypto_value": "font-mono font-bold tracking-tight text-white"
+    }
+  },
+  "colors": {
+    "base": {
+      "background_main": "#07090E",
+      "background_secondary": "#0D111A",
+      "card_bg": "#121824",
+      "card_hover_bg": "#172030",
+      "header_bg": "rgba(13, 17, 26, 0.85)",
+      "modal_bg": "#101622"
+    },
+    "text": {
+      "primary": "#FFFFFF",
+      "secondary": "#94A3B8",
+      "muted": "#64748B",
+      "brand_accent": "#38BDF8",
+      "glow_text": "#60A5FA"
+    },
+    "brand_accents": {
+      "electric_blue_primary": "#2563EB",
+      "electric_blue_bright": "#3B82F6",
+      "electric_blue_glow": "#60A5FA",
+      "electric_cyan": "#06B6D4",
+      "cyan_glow": "rgba(6, 182, 212, 0.25)"
+    },
+    "vault_tiers": {
+      "flex": {
+        "color": "#38BDF8",
+        "bg_badge": "rgba(56, 189, 248, 0.12)",
+        "border": "rgba(56, 189, 248, 0.3)"
+      },
+      "silver": {
+        "color": "#CBD5E1",
+        "bg_badge": "rgba(203, 213, 225, 0.12)",
+        "border": "rgba(203, 213, 225, 0.3)"
+      },
+      "gold": {
+        "color": "#F59E0B",
+        "bg_badge": "rgba(245, 158, 11, 0.12)",
+        "border": "rgba(245, 158, 11, 0.3)"
+      },
+      "platinum": {
+        "color": "#E2E8F0",
+        "bg_badge": "rgba(226, 232, 240, 0.15)",
+        "border": "rgba(226, 232, 240, 0.4)"
+      },
+      "diamond": {
+        "color": "#A855F7",
+        "bg_badge": "rgba(168, 85, 247, 0.15)",
+        "border": "rgba(168, 85, 247, 0.4)"
+      }
+    },
+    "status": {
+      "success": "#10B981",
+      "success_glow": "rgba(16, 185, 129, 0.2)",
+      "warning": "#F59E0B",
+      "danger": "#EF4444",
+      "info": "#3B82F6"
+    },
+    "borders": {
+      "subtle": "rgba(255, 255, 255, 0.08)",
+      "medium": "rgba(255, 255, 255, 0.15)",
+      "accent_active": "rgba(59, 130, 246, 0.5)",
+      "glow": "rgba(59, 130, 246, 0.3)"
+    }
+  },
+  "spacing_and_layout": {
+    "grid_modes": {
+      "landing_features": "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8",
+      "bento_hero": "grid grid-cols-1 md:grid-cols-12 gap-6",
+      "dashboard_metrics": "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6",
+      "vaults_grid": "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+    },
+    "container_padding": "px-4 sm:px-6 lg:px-12 py-8 md:py-16",
+    "card_padding": "p-5 sm:p-7",
+    "pwa_max_width": "max-w-md sm:max-w-2xl lg:max-w-7xl mx-auto"
+  },
+  "visual_enhancers": {
+    "glow_effects": {
+      "blue_radial_bg": "background: radial-gradient(circle at 50% -20%, rgba(37, 99, 235, 0.18) 0%, rgba(7, 9, 14, 0) 70%)",
+      "cyan_accent_glow": "box-shadow: 0 0 25px -5px rgba(56, 189, 248, 0.3)",
+      "card_border_glow": "hover:border-blue-500/50 hover:shadow-[0_0_20px_rgba(37,99,235,0.25)] transition-all duration-300"
+    },
+    "glassmorphism": {
+      "navbar": "backdrop-blur-xl bg-[#0D111A]/85 border-b border-white/10 shadow-2xl z-50",
+      "pwa_bar": "backdrop-blur-xl bg-[#07090E]/90 border-t border-white/10 z-50",
+      "overlay_card": "backdrop-blur-md bg-[#121824]/90 border border-white/10 shadow-xl"
+    },
+    "textures": "Subtle noise background or radial grid pattern overlay for high-tech financial terminal depth."
+  },
+  "component_styles": {
+    "buttons": {
+      "primary": "bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6 py-3 rounded-xl shadow-[0_0_20px_rgba(37,99,235,0.4)] hover:shadow-[0_0_28px_rgba(59,130,246,0.6)] active:scale-[0.98] transition-all duration-200 border border-blue-400/30",
+      "secondary": "bg-slate-800/80 hover:bg-slate-700 text-slate-100 font-medium px-5 py-2.5 rounded-xl border border-white/10 hover:border-white/20 transition-all duration-200",
+      "pill_glow": "bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold rounded-full px-8 py-3.5 shadow-lg shadow-blue-500/25 transition-all duration-200"
+    },
+    "cards": {
+      "stat_card": "bg-[#121824] border border-white/10 rounded-2xl p-6 shadow-xl relative overflow-hidden group hover:border-blue-500/40 transition-all duration-300",
+      "vault_card": "bg-gradient-to-b from-[#141C2E] to-[#0F1420] border border-white/10 rounded-2xl p-6 relative flex flex-col justify-between hover:border-blue-500/50 shadow-2xl transition-all duration-300"
+    },
+    "inputs": {
+      "pin_input": "w-12 h-14 sm:w-14 sm:h-16 text-2xl font-mono text-center bg-[#0B0E17] border border-white/15 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 rounded-xl text-white outline-none transition-all",
+      "text_input": "bg-[#0B0E17] border border-white/15 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-white placeholder-slate-500 rounded-xl px-4 py-3 outline-none transition-all w-full"
+    },
+    "badges": {
+      "pwa_badge": "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 shadow-sm",
+      "status_active": "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+    }
+  },
+  "motion_and_interactions": {
+    "live_ticking_profit": {
+      "description": "Smooth live counter ticking for XRP yield accrual in realtime using requestAnimationFrame or 100ms interval.",
+      "visual_feedback": "Subtle green pulse or light glow shift on monetary digit updates without jumping screen position.",
+      "font": "JetBrains Mono tabular figures (font-mono tabular-nums)"
+    },
+    "landing_reveals": "Framer Motion staggered opacity and slide-up transitions (duration 0.5s, easeOut).",
+    "micro_interactions": {
+      "hover": "Scale 1.02 on vault cards and key CTAs",
+      "tap": "Active scale 0.98 on buttons",
+      "modal_fade": "Smooth spring transition for PIN unlock and mnemonic wallet phrase modal screens"
+    }
+  },
+  "image_urls": {
+    "app_hero_mockup": {
+      "url": "https://images.pexels.com/photos/6771671/pexels-photo-6771671.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Hand holding phone showing cryptocurrency trends with coins in the background for hero app mockup."
+    },
+    "mobile_dashboard_screen": {
+      "url": "https://images.unsplash.com/photo-1643488072086-9d7318c0a04b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjh8MHwxfHNlYXJjaHwyfHxjcnlwdG8lMjB3YWxsZXQlMjBhcHAlMjBkYXJrJTIwbW9kZSUyMGx1eHVyeSUyMGZpbnRlY2glMjB4cnB8ZW58MHx8fHwxNzg5NTg3MzE0fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Phone displaying real-time financial tracking app interface."
+    },
+    "security_vault_bg": {
+      "url": "https://images.pexels.com/photos/6771985/pexels-photo-6771985.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Smartphone with financial data on dark table near scattered coins."
+    }
+  },
+  "accessibility_and_testing": {
+    "data_testid_convention": "All interactive elements (buttons, inputs, tabs, modals, tables, metrics) MUST have kebab-case `data-testid` attributes (e.g. data-testid=\"deposit-xrp-button\", data-testid=\"user-balance-amount\").",
+    "contrast_wcag": "Text contrast maintained above 4.5:1 on dark slate surfaces. Interactive focus outlines using bright electric blue rings.",
+    "keyboard_nav": "Full support for Enter/Space triggers, ESC key modal dismissals, tab order across PIN login and registration steps."
+  },
+  "instructions_to_main_agent": [
+    "Ensure dark near-black aesthetic (#07090E) with bright electric blue accents (#2563EB / #3B82F6) and glowing borders across all pages.",
+    "Header and dropdowns MUST NEVER have completely transparent backgrounds; always use `backdrop-blur-xl bg-[#0D111A]/90 border border-white/10`.",
+    "Implement data-testid on all interactive buttons, inputs, vault selection cards, tabs, and user profile actions.",
+    "Ensure monetary values use JetBrains Mono or tabular nums so live profit ticking doesn't jitter layout.",
+    "Support both desktop layout and PWA installable mobile feel with bottom nav or responsive app frame where applicable.",
+    "Adhere strictly to .js/.jsx React frontend setup without introducing breaking type definitions."
+  ],
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "Never use generic AI purple slop gradients.",
+    "Use layered ambient shadows with crisp border-white/10 highlights for depth.",
+    "Micro-interactions on every button, link, and interactive card.",
+    "Include high-contrast badges for VIP tiers and deposit statuses.",
+    "All test ids MUST follow kebab-case naming convention."
+  ]
+}
