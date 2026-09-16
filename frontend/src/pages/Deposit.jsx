@@ -95,7 +95,7 @@ export default function Deposit() {
           <label className="text-xs font-semibold uppercase tracking-wider text-blue-600">Amount sent (XRP)</label>
           <input data-testid="deposit-amount-input" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1.5 w-full bg-slate-50 border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 rounded-xl px-4 py-3 text-slate-900 outline-none font-mono transition-all" placeholder="0.00" />
         </div>
-        <button onClick={submit} disabled={submitting || locked} data-testid="submit-deposit-button" className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-semibold py-3 rounded-xl glow-blue transition-all">
+        <button onClick={submit} disabled={submitting || locked} data-testid="submit-deposit-button" className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold py-3 rounded-xl glow-blue transition-all">
           {submitting ? <Loader2 className="animate-spin" size={18} /> : "Submit deposit for confirmation"}
         </button>
         {locked && <p className="text-xs text-red-500 text-center">Your wallet is locked — deposits disabled.</p>}

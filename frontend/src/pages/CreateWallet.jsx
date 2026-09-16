@@ -105,7 +105,7 @@ export default function CreateWallet() {
                 <input data-testid="register-username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value.replace(/\s/g, "") })} className={`${inputCls} font-mono`} placeholder="ada_vip" />
                 <p className="text-xs text-slate-400 mt-1.5">Must be unique. This is how you log in with your phrase.</p>
               </div>
-              <button type="submit" disabled={loading} data-testid="register-submit-button" className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold py-3.5 rounded-xl glow-blue disabled:opacity-60 active:scale-[0.99] transition-all">
+              <button type="submit" disabled={loading} data-testid="register-submit-button" className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3.5 rounded-xl glow-blue disabled:opacity-60 active:scale-[0.99] transition-all">
                 {loading ? <Loader2 className="animate-spin" size={18} /> : "Generate my wallet"}
               </button>
             </form>
@@ -151,7 +151,7 @@ export default function CreateWallet() {
               <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} data-testid="confirm-saved-checkbox" className="mt-0.5 w-5 h-5 accent-blue-600" />
               <span className="text-sm text-slate-700">I have safely saved my 12-word recovery phrase.</span>
             </label>
-            <button disabled={!confirmed} onClick={() => setStep(2)} data-testid="phrase-continue-button" className="w-full mt-5 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-3.5 rounded-xl glow-blue active:scale-[0.99] transition-all">Continue</button>
+            <button disabled={!confirmed} onClick={() => setStep(2)} data-testid="phrase-continue-button" className="w-full mt-5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-3.5 rounded-xl glow-blue active:scale-[0.99] transition-all">Continue</button>
           </motion.div>
         )}
 
@@ -163,7 +163,7 @@ export default function CreateWallet() {
             <h1 className="text-2xl font-bold text-slate-900">{pinStage === 0 ? "Set a PIN" : "Confirm your PIN"}</h1>
             <p className="text-sm text-slate-500 mt-2 mb-7">{pinStage === 0 ? "Your phrase is encrypted on this device behind this PIN." : "Enter your PIN again to confirm."}</p>
             {pinStage === 0 ? <PinInput value={pin} onChange={setPin} onComplete={finishPin} testid="setup-pin" /> : <PinInput value={pin2} onChange={setPin2} onComplete={finishPin} testid="confirm-pin" />}
-            <button disabled={loading || (pinStage === 0 ? pin.length !== 4 : pin2.length !== 4)} onClick={finishPin} data-testid="pin-continue-button" className="w-full mt-8 flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white font-semibold py-3.5 rounded-xl glow-blue active:scale-[0.99] transition-all">
+            <button disabled={loading || (pinStage === 0 ? pin.length !== 4 : pin2.length !== 4)} onClick={finishPin} data-testid="pin-continue-button" className="w-full mt-8 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-semibold py-3.5 rounded-xl glow-blue active:scale-[0.99] transition-all">
               {loading ? <Loader2 className="animate-spin" size={18} /> : pinStage === 0 ? "Set PIN" : "Enter wallet"}
             </button>
           </motion.div>

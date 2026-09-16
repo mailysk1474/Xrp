@@ -91,7 +91,7 @@ function PhoneMock() {
               </div>
               <div className="grid grid-cols-2 gap-1.5 mt-2.5">
                 <div className="bg-white rounded-lg text-center py-1.5 text-blue-700 text-[9px] font-semibold">Deposit</div>
-                <div className="bg-blue-500/40 border border-white/30 rounded-lg text-center py-1.5 text-white text-[9px] font-semibold">Withdraw</div>
+                <div className="bg-slate-900 rounded-lg text-center py-1.5 text-white text-[9px] font-semibold">Withdraw</div>
               </div>
             </div>
 
@@ -163,7 +163,7 @@ export default function Landing() {
             <a href="#security" className="hover:text-slate-900 transition-colors">Security</a>
             <Link to="/whitepaper" data-testid="nav-whitepaper" className="hover:text-slate-900 transition-colors">Whitepaper</Link>
           </nav>
-          <Link to="/create" data-testid="nav-get-started" className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold px-4 py-2 rounded-xl glow-blue transition-all active:scale-95">
+          <Link to="/create" data-testid="nav-get-started" className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-xl glow-blue transition-all active:scale-95">
             Get Started <ArrowRight size={15} />
           </Link>
         </div>
@@ -184,10 +184,10 @@ export default function Landing() {
               Generate a private wallet in seconds, stake XRP into premium vaults, and watch your yield accrue live — secured by a PIN only you control.
             </motion.p>
             <motion.div variants={fadeUp} initial="hidden" animate="show" custom={3} className="flex flex-wrap gap-3 mt-8">
-              <Link to="/create" data-testid="hero-get-started" className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold px-6 py-3.5 rounded-xl glow-blue transition-all active:scale-95">
+              <Link to="/create" data-testid="hero-get-started" className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6 py-3.5 rounded-xl glow-blue transition-all active:scale-95">
                 <Wallet size={18} /> Create your wallet
               </Link>
-              <Link to="/recover" data-testid="hero-login" className="flex items-center gap-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 font-semibold px-6 py-3.5 rounded-xl transition-colors">
+              <Link to="/recover" data-testid="hero-login" className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold px-6 py-3.5 rounded-xl transition-colors">
                 <Download size={18} /> I have a phrase
               </Link>
             </motion.div>
@@ -311,7 +311,7 @@ export default function Landing() {
           <Eye className="mx-auto text-blue-600 mb-5" size={34} />
           <h2 className="text-3xl sm:text-5xl font-bold max-w-3xl mx-auto leading-tight text-slate-900">Self-custody in your pocket. Only you hold the keys.</h2>
           <p className="text-slate-500 mt-5 max-w-xl mx-auto">Install XamanProtocol to your home screen and access your VIP vaults like a native app — anywhere, anytime.</p>
-          <Link to="/create" data-testid="cta-create" className="inline-flex items-center gap-2 mt-8 bg-slate-900 hover:bg-slate-800 text-white font-semibold px-8 py-4 rounded-2xl glow-blue transition-all active:scale-95">
+          <Link to="/create" data-testid="cta-create" className="inline-flex items-center gap-2 mt-8 bg-blue-600 hover:bg-blue-500 text-white font-semibold px-8 py-4 rounded-2xl glow-blue transition-all active:scale-95">
             <Wallet size={18} /> Create my wallet
           </Link>
         </motion.div>

@@ -59,7 +59,7 @@ export default function Unlock() {
 
           {error && <p className="text-sm text-red-500 mt-4" data-testid="unlock-error">{error}</p>}
 
-          <button disabled={loading || pin.length !== 4} onClick={() => unlock()} data-testid="unlock-button" className="w-full mt-8 flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white font-semibold py-3.5 rounded-xl glow-blue transition-all">
+          <button disabled={loading || pin.length !== 4} onClick={() => unlock()} data-testid="unlock-button" className="w-full mt-8 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-semibold py-3.5 rounded-xl glow-blue transition-all">
             {loading ? <Loader2 className="animate-spin" size={18} /> : "Unlock"}
           </button>
 

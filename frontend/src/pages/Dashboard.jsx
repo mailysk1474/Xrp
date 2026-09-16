@@ -93,7 +93,7 @@ export default function Dashboard() {
             <button onClick={() => navigate("/app/deposit")} data-testid="quick-deposit-button" className="flex-1 flex items-center justify-center gap-2 bg-white text-blue-700 font-semibold py-3 rounded-xl hover:bg-blue-50 active:scale-[0.99] transition-all">
               <ArrowDownToLine size={17} /> Deposit
             </button>
-            <button onClick={() => navigate("/app/withdraw")} data-testid="quick-withdraw-button" className="flex-1 flex items-center justify-center gap-2 bg-blue-500/40 hover:bg-blue-500/60 border border-white/30 text-white font-semibold py-3 rounded-xl transition-colors">
+            <button onClick={() => navigate("/app/withdraw")} data-testid="quick-withdraw-button" className="flex-1 flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold py-3 rounded-xl transition-colors">
               <ArrowUpFromLine size={17} /> Withdraw
             </button>
           </div>
@@ -135,7 +135,7 @@ export default function Dashboard() {
           <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-8 text-center" data-testid="no-stakes">
             <Layers className="mx-auto text-slate-300 mb-3" size={30} />
             <p className="text-slate-500 text-sm">No active stakes yet. Deposit XRP and open a vault to start earning.</p>
-            <button onClick={() => navigate("/app/vaults")} data-testid="open-first-vault-button" className="mt-4 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors">Open a vault</button>
+            <button onClick={() => navigate("/app/vaults")} data-testid="open-first-vault-button" className="mt-4 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors">Open a vault</button>
           </div>
         ) : (
           <div className="space-y-3" data-testid="active-stakes-list">
