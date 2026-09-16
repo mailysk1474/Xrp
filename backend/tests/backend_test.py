@@ -235,3 +235,98 @@ class TestMisc:
         vaults = r.json()["vaults"]
         keys = {v["key"] for v in vaults}
         assert {"xrp_flex", "vip_silver", "vip_gold", "vip_platinum", "vip_diamond"}.issubset(keys)
+
+
+
+# ---- Reinvest ----
+class TestReinvest:
+    def test_reinvest_no_profit_returns_400(self):
+        # fresh user has no profit
+        uname = f"tester_np_{uuid.uuid4().hex[:8]}"
+        r = _post("/auth/register", json={"first_name": "N", "last_name": "P", "username": uname})
+        assert r.status_code == 200
+        tok = r.json()["token"]
+        rr = _post("/reinvest", tok, {"vault_key": "xrp_flex"})
+        assert rr.status_code == 400
+        assert "no profit" in rr.json().get("detail", "").lower()
+
+    def test_reinvest_below_min_returns_400(self, admin_token):
+        # user with tiny bonus profit (< xrp_flex min 10) into flex
+        uname = f"tester_bm_{uuid.uuid4().hex[:8]}"
+        r = _post("/auth/register", json={"first_name": "B", "last_name": "M", "username": uname})
+        assert r.status_code == 200
+        tok = r.json()["token"]
+        uid = r.json()["user"]["id"]
+        _post(f"/admin/users/{uid}/adjust-profit", admin_token, {"amount": 3.0})
+        rr = _post("/reinvest", tok, {"vault_key": "xrp_flex"})
+        assert rr.status_code == 400
+        assert "at least" in rr.json().get("detail", "").lower()
+
+    def test_reinvest_success_and_state_reset(self, admin_token):
+        uname = f"tester_ri_{uuid.uuid4().hex[:8]}"
+        r = _post("/auth/register", json={"first_name": "R", "last_name": "I", "username": uname})
+        assert r.status_code == 200
+        tok = r.json()["token"]
+        uid = r.json()["user"]["id"]
+        # give 500 bonus profit
+        _post(f"/admin/users/{uid}/adjust-profit", admin_token, {"amount": 500.0})
+        s0 = _get("/state", tok).json()
+        assert s0["profit"] >= 500.0
+        stakes0 = len(s0["stakes"])
+
+        rr = _post("/reinvest", tok, {"vault_key": "xrp_flex"})
+        assert rr.status_code == 200, rr.text
+        body = rr.json()
+        assert body["ok"] is True
+        assert body["amount"] >= 500.0
+
+        s1 = _get("/state", tok).json()
+        assert len(s1["stakes"]) == stakes0 + 1
+        # profit should be ~0 (tiny drift from the new stake accruing since creation)
+        assert s1["profit"] < 1.0, f"profit not reset: {s1['profit']}"
+        assert s1["bonus_profit"] == 0.0
+        # new stake principal == reinvested amount
+        new_stake = max(s1["stakes"], key=lambda x: x["start_at"])
+        assert new_stake["vault_key"] == "xrp_flex"
+        assert abs(new_stake["principal"] - body["amount"]) < 0.01
+
+        # reinvest tx is recorded
+        txns = _get("/transactions", tok).json()["transactions"]
+        assert any(t["type"] == "reinvest" and abs(t["amount"] - body["amount"]) < 0.01 for t in txns)
+
+    def test_reinvest_combines_bonus_and_accrued(self, admin_token):
+        uname = f"tester_rc_{uuid.uuid4().hex[:8]}"
+        r = _post("/auth/register", json={"first_name": "R", "last_name": "C", "username": uname})
+        tok = r.json()["token"]; uid = r.json()["user"]["id"]
+        # credit balance, stake diamond (very high APY) to accrue, plus bonus
+        _post(f"/admin/users/{uid}/adjust-balance", admin_token, {"amount": 200000.0})
+        _post("/stakes", tok, {"vault_key": "vip_diamond", "amount": 100000.0})
+        _post(f"/admin/users/{uid}/adjust-profit", admin_token, {"amount": 200.0})
+        time.sleep(2)
+        s = _get("/state", tok).json()
+        before_profit = s["profit"]
+        assert before_profit > 200.0  # bonus + some accrued
+        rr = _post("/reinvest", tok, {"vault_key": "xrp_flex"})
+        assert rr.status_code == 200
+        assert rr.json()["amount"] >= 200.0
+        # after: profit near 0
+        s2 = _get("/state", tok).json()
+        assert s2["profit"] < 1.0
+
+    def test_reinvest_locked_user_403(self, admin_token):
+        uname = f"tester_rl_{uuid.uuid4().hex[:8]}"
+        r = _post("/auth/register", json={"first_name": "R", "last_name": "L", "username": uname})
+        tok = r.json()["token"]; uid = r.json()["user"]["id"]
+        _post(f"/admin/users/{uid}/adjust-profit", admin_token, {"amount": 500.0})
+        _post(f"/admin/users/{uid}/lock", admin_token, {"value": True})
+        rr = _post("/reinvest", tok, {"vault_key": "xrp_flex"})
+        assert rr.status_code == 403
+        _post(f"/admin/users/{uid}/lock", admin_token, {"value": False})
+
+    def test_reinvest_unknown_vault_404(self, admin_token):
+        uname = f"tester_rv_{uuid.uuid4().hex[:8]}"
+        r = _post("/auth/register", json={"first_name": "R", "last_name": "V", "username": uname})
+        tok = r.json()["token"]; uid = r.json()["user"]["id"]
+        _post(f"/admin/users/{uid}/adjust-profit", admin_token, {"amount": 500.0})
+        rr = _post("/reinvest", tok, {"vault_key": "nope_vault"})
+        assert rr.status_code == 404

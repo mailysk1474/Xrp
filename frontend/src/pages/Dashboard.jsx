@@ -177,7 +177,7 @@ export default function Dashboard() {
           <p className="text-2xl font-bold font-mono tabular-nums text-emerald-600">
             <LiveProfit stakes={activeStakes} bonus={s.bonus_profit} offsetRef={serverOffset} /> <span className="text-sm text-slate-400">XRP</span>
           </p>
-          {s.profit > 0 && (
+          {s.profit >= 10 && (
             <button onClick={() => setReinvestOpen(true)} data-testid="reinvest-button" className="mt-2.5 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg px-3 py-1.5 transition-colors">
               <Repeat size={13} /> Reinvest profit
             </button>

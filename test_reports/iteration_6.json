@@ -1,0 +1,52 @@
+{
+  "summary": "Round 6 — tested new REINVEST + COMPARE VAULTS features (both backend & frontend) plus regression. All 25 backend tests pass (6 new for /api/reinvest). End-to-end frontend flow verified for reinvest dialog and vault comparison panel with math checks. No blocking issues.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Reinvest dialog + Stake dialog", "issues": ["Radix DialogContent emits console warning: Missing `Description` or `aria-describedby` for {DialogContent}. Not blocking; adding <DialogDescription> or aria-describedby='undefined' would silence and improve a11y."]}
+    ]
+  },
+  "reinvest_verifications": {
+    "POST /api/reinvest no profit -> 400 'You have no profit to reinvest yet.'": "PASS",
+    "POST /api/reinvest profit < vault.min_amount -> 400 with helpful 'at least {min} XRP' message": "PASS",
+    "POST /api/reinvest success: combines bonus_profit + net accrued, creates new stake, returns {ok, amount}, records 'reinvest' txn": "PASS",
+    "After reinvest GET /api/state: profit ~ 0 (< 1 XRP drift), bonus_profit == 0, new stake principal == amount, stake count +1": "PASS",
+    "Locked user POST /api/reinvest -> 403": "PASS",
+    "Unknown vault_key -> 404": "PASS",
+    "Frontend: reinvest-button appears in Total Profit card when profit > 0": "PASS",
+    "Frontend: clicking opens reinvest-dialog with reinvest-amount showing '500.00 XRP'": "PASS",
+    "Frontend: reinvest-vault-xrp_flex present + selected by default; reinvest-vault-vip_silver disabled when profit < min (500 < 1000)": "PASS",
+    "Frontend: confirm-reinvest-button reinvests, closes dialog, toast, new active stake appears, profit resets": "PASS (dashboard immediately reflects new stake)"
+  },
+  "compare_verifications": {
+    "/app/vaults: compare-toggle visible, compare-panel hidden by default": "PASS",
+    "Click compare-toggle -> compare-panel appears with 5 rows (compare-row-<key> for all 5 vaults)": "PASS",
+    "compare-amount input recalculates 'Yield at maturity' and 'Annualized' live": "PASS — xrp_flex @1000 -> +52/+52; @5000 -> +260/+260; vip_diamond @5000 -> +1,923.29 (90d) / +7,800.00 (annual). Math matches amount * apy * (dur/365) for term and amount*apy for annualized.",
+    "Toggle again hides compare-panel": "PASS"
+  },
+  "regression_verifications": {
+    "Existing 19 backend tests still green (auth, vaults, stakes create/min/insufficient/accrual, deposit-claim + confirm, withdraw approve/reject, lock+withdrawals_disabled enforcement, audit, no-store, vaults public)": "PASS (25/25)",
+    "Live accrual still ticks (test_stake_success_and_live_accrual asserts monotonic increase over 3s)": "PASS",
+    "New stake created via reinvest starts accruing fresh": "Observed — reinvest-button reappeared shortly after reinvest because the new xrp_flex stake accrued micro-profit; consistent with spec's 'minus tiny time drift'."
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "(Optional a11y) Add <DialogDescription> (or aria-describedby) to reinvest-dialog and stake-dialog to silence Radix console warning.",
+    "(Optional UX) After reinvest, the Reinvest button re-appears immediately because the new stake starts accruing >0 within ms — consider hiding the button while profit < some small epsilon (e.g. < 1 XRP) or < selected vault min. Not a bug per spec but slightly noisy."
+  ],
+  "critical_code_review_comments": [
+    "server.py serialize_stake now correctly subtracts claimed_profit from accrued, preventing double-count after reinvest — verified end-to-end.",
+    "reinvest endpoint snapshots accrued once per stake and writes claimed_profit=that accrued value; safe against re-entry but not transactional across users (acceptable for single-user compound).",
+    "ReinvestDialog fetches /vaults on open — could reuse serverState-cached list from a shared context, but not blocking.",
+    "No _id leak in any response; all endpoints use str(_id)."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py (added TestReinvest with 6 tests)"],
+  "success_rate": {"backend": "100% (25/25)", "frontend": "100% on tested flows"},
+  "test_credentials": "Admin: username=admin phrase='legal winner thank year wave sausage worth useful legal winner thank yellow'. Test users are auto-created per test via /api/auth/register.",
+  "seed_data_creation": "Playwright test seeded a UI test user via API and injected xp_token into localStorage to bypass PIN vault (only present after explicit CreateWallet flow). No leftover admin state changes beyond +500 bonus_profit on transient user accounts.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Reinvest + Compare features are green E2E. Auth in this app is username + 12-word phrase + local PIN vault; the fastest way to test authenticated pages in Playwright is: register user via POST /api/auth/register, then localStorage.setItem('xp_token', token) and navigate to /app — this skips the PIN unlock (only enforced when a vault entry exists). Give a user profit fast via admin POST /api/admin/users/{id}/adjust-profit (bonus_profit)."
+}
