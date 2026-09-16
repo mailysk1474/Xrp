@@ -141,52 +141,52 @@ function MacMock() {
 
 function SlimPhone() {
   return (
-    <div className="rounded-[2rem] border-[6px] border-slate-900 bg-slate-900 p-1 shadow-2xl" style={{ boxShadow: "0 30px 60px -18px rgba(15,23,42,0.5)" }}>
+    <div className="rounded-[1.8rem] border-[5px] border-slate-900 bg-slate-900 p-0.5 shadow-2xl" style={{ boxShadow: "0 30px 60px -18px rgba(15,23,42,0.5)" }}>
       <div className="rounded-[1.5rem] overflow-hidden bg-[#F7F9FC]">
         {/* notch */}
         <div className="relative bg-white">
-          <div className="h-5 flex items-center justify-center"><div className="w-12 h-1.5 rounded-full bg-slate-900" /></div>
+          <div className="h-4 flex items-center justify-center"><div className="w-10 h-1 rounded-full bg-slate-900" /></div>
         </div>
-        <div className="p-2.5 space-y-2.5">
+        <div className="px-2 pb-2 pt-1 space-y-2">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[7px] text-slate-400">Welcome back,</p>
-              <p className="text-[10px] font-bold text-slate-900 leading-tight">Ada Lovelace</p>
+              <p className="text-[6px] text-slate-400 leading-none">Welcome back,</p>
+              <p className="text-[8px] font-bold text-slate-900 leading-tight mt-0.5">Ada L.</p>
             </div>
-            <span className="flex items-center gap-0.5 text-[7px] px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200"><Crown size={7} /> VIP</span>
+            <span className="flex items-center gap-0.5 text-[6px] px-1 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200"><Crown size={6} /> VIP</span>
           </div>
 
-          <div className="rounded-xl bg-gradient-to-br from-blue-600 to-blue-700 p-2.5">
-            <p className="text-[7px] text-blue-100 uppercase tracking-wider">Balance</p>
-            <p className="font-mono text-[16px] font-bold text-white leading-tight mt-0.5">128,450.<span className="text-blue-200 text-[11px]">00</span></p>
-            <div className="flex items-center gap-1 mt-0.5 text-[7px]">
-              <TrendingUp size={7} className="text-emerald-300" />
-              <span className="font-mono text-white">+312.884201</span>
+          <div className="rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 p-2">
+            <p className="text-[6px] text-blue-100 uppercase tracking-wide leading-none">Balance</p>
+            <p className="font-mono text-[11px] font-bold text-white leading-tight mt-0.5">128,450<span className="text-blue-200 text-[8px]">.00</span></p>
+            <div className="flex items-center gap-0.5 mt-0.5 text-[6px]">
+              <TrendingUp size={6} className="text-emerald-300" />
+              <span className="font-mono text-white">+312.88</span>
             </div>
-            <div className="grid grid-cols-2 gap-1 mt-2">
-              <div className="bg-white rounded-md text-center py-1 text-blue-700 text-[8px] font-semibold">Deposit</div>
-              <div className="bg-slate-900 rounded-md text-center py-1 text-white text-[8px] font-semibold">Withdraw</div>
+            <div className="grid grid-cols-2 gap-1 mt-1.5">
+              <div className="bg-white rounded text-center py-0.5 text-blue-700 text-[6px] font-semibold">Deposit</div>
+              <div className="bg-slate-900 rounded text-center py-0.5 text-white text-[6px] font-semibold">Withdraw</div>
             </div>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl p-2">
+          <div className="bg-white border border-slate-200 rounded-lg p-1.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1">
-                <div className="w-5 h-5 rounded-md bg-purple-100 flex items-center justify-center"><Layers size={9} className="text-purple-600" /></div>
-                <p className="text-[8px] font-semibold text-slate-900 leading-none">VIP Diamond</p>
+                <div className="w-4 h-4 rounded bg-purple-100 flex items-center justify-center"><Layers size={7} className="text-purple-600" /></div>
+                <p className="text-[7px] font-semibold text-slate-900 leading-none">Diamond</p>
               </div>
-              <span className="text-[7px] px-1 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200">Active</span>
+              <span className="text-[5px] px-1 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200">Active</span>
             </div>
-            <div className="flex items-center justify-between mt-1.5 px-1.5 py-1 rounded-md bg-blue-50">
-              <span className="text-[7px] text-slate-500 flex items-center gap-0.5"><Clock size={7} /> Unlocks</span>
-              <span className="font-mono text-[8px] font-semibold text-blue-600">62d 4h</span>
+            <div className="flex items-center justify-between mt-1 px-1 py-0.5 rounded bg-blue-50">
+              <span className="text-[6px] text-slate-500 flex items-center gap-0.5"><Clock size={6} /> Unlocks</span>
+              <span className="font-mono text-[6px] font-semibold text-blue-600">62d 4h</span>
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-5 border-t border-slate-200 bg-white">
           {[{ i: LayoutDashboard, a: true }, { i: Layers }, { i: ArrowDownToLine }, { i: ArrowUpFromLine }, { i: Receipt }].map((n, k) => (
-            <div key={k} className={`flex justify-center py-1.5 ${n.a ? "text-blue-600" : "text-slate-300"}`}><n.i size={12} /></div>
+            <div key={k} className={`flex justify-center py-1 ${n.a ? "text-blue-600" : "text-slate-300"}`}><n.i size={10} /></div>
           ))}
         </div>
       </div>
@@ -198,10 +198,10 @@ function SlimPhone() {
 function PhoneMock() {
   return (
     <div className="relative mx-auto w-full max-w-[500px] pt-4 pb-8">
-      <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: "easeOut" }} className="w-[86%] ml-0">
+      <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: "easeOut" }} className="w-[84%] ml-0">
         <MacMock />
       </motion.div>
-      <motion.div initial={{ opacity: 0, y: 30, x: 20 }} animate={{ opacity: 1, y: 0, x: 0 }} transition={{ duration: 0.8, delay: 0.15, ease: "easeOut" }} className="absolute right-0 bottom-0 w-[128px] animate-float z-10">
+      <motion.div initial={{ opacity: 0, y: 30, x: 20 }} animate={{ opacity: 1, y: 0, x: 0 }} transition={{ duration: 0.8, delay: 0.15, ease: "easeOut" }} className="absolute right-0 bottom-0 w-[152px] animate-float z-10">
         <SlimPhone />
       </motion.div>
     </div>
