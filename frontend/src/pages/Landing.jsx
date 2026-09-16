@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Logo } from "@/components/Logo";
@@ -7,6 +7,7 @@ import {
   ShieldCheck, KeyRound, Fingerprint, Layers, TrendingUp, Smartphone,
   Lock, Eye, ArrowRight, Download, CheckCircle2, Wallet, Crown, Clock,
   LayoutDashboard, ArrowDownToLine, ArrowUpFromLine, Receipt, Sparkles, LockKeyhole,
+  Coins, Percent, Timer, ArrowUp, Twitter, Send, Mail,
 } from "lucide-react";
 
 const fadeUp = {
@@ -142,6 +143,81 @@ function PhoneMock() {
   );
 }
 
+const CALC_VAULTS = [
+  { key: "xrp_flex", name: "XRP Flex", apy: 0.052 },
+  { key: "vip_silver", name: "VIP Silver", apy: 0.192 },
+  { key: "vip_gold", name: "VIP Gold", apy: 0.384 },
+  { key: "vip_platinum", name: "VIP Platinum", apy: 0.836 },
+  { key: "vip_diamond", name: "VIP Diamond", apy: 1.56 },
+];
+
+const TIERS_TABLE = [
+  { tier: "Starter", min: "0", flagship: "XRP Flex · 5.2%", lock: "Flexible", color: "#64748B" },
+  { tier: "Silver", min: "1,000", flagship: "VIP Silver · 19.2%", lock: "30 days", color: "#64748B" },
+  { tier: "Gold", min: "5,000", flagship: "VIP Gold · 38.4%", lock: "45 days", color: "#D97706" },
+  { tier: "Platinum", min: "25,000", flagship: "VIP Platinum · 83.6%", lock: "60 days", color: "#475569" },
+  { tier: "Diamond", min: "100,000", flagship: "VIP Diamond · 156%", lock: "90 days", color: "#9333EA" },
+];
+
+const EDU = [
+  { icon: Coins, title: "What is staking?", text: "Staking commits your XRP to a vault for a set period. In return the protocol pays you yield — like earning interest, but crypto-native." },
+  { icon: Percent, title: "Fixed, transparent APY", text: "Every vault shows its exact annual percentage yield up front. No hidden fees and no moving goalposts — what you see is what you earn." },
+  { icon: Timer, title: "Continuous accrual", text: "Your profit is calculated every second against your staked amount, so your balance grows in real time — not once a month." },
+  { icon: ShieldCheck, title: "Maturity & withdrawal", text: "Fixed-term vaults unlock at maturity, after which your principal and earned yield become available to withdraw." },
+];
+
+function YieldCalculator() {
+  const [amount, setAmount] = useState(5000);
+  const [vault, setVault] = useState(CALC_VAULTS[3]);
+  const [live, setLive] = useState(0);
+  const startRef = useRef(Date.now());
+  const perYear = amount * vault.apy;
+  const perSecond = perYear / (365 * 24 * 3600);
+
+  useEffect(() => { startRef.current = Date.now(); setLive(0); }, [amount, vault]);
+  useEffect(() => {
+    let raf;
+    const tick = () => {
+      const el = (Date.now() - startRef.current) / 1000;
+      setLive(perSecond * el);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [perSecond]);
+
+  const money = (n, d = 2) => Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+
+  return (
+    <div className="grid lg:grid-cols-2 gap-6 bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm">
+      <div>
+        <label className="text-xs font-semibold uppercase tracking-wider text-blue-600">Amount to stake (XRP)</label>
+        <input type="number" value={amount} onChange={(e) => setAmount(Math.max(0, parseFloat(e.target.value) || 0))} data-testid="calc-amount" className="mt-1.5 w-full bg-slate-50 border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 rounded-xl px-4 py-3 text-slate-900 font-mono outline-none transition-all" />
+        <input type="range" min="100" max="200000" step="100" value={Math.min(amount, 200000)} onChange={(e) => setAmount(parseFloat(e.target.value))} className="w-full mt-4 accent-blue-600" />
+        <p className="text-xs font-semibold uppercase tracking-wider text-blue-600 mt-6 mb-2">Choose a vault</p>
+        <div className="flex flex-wrap gap-2">
+          {CALC_VAULTS.map((v) => (
+            <button key={v.key} onClick={() => setVault(v)} data-testid={`calc-vault-${v.key}`} className={`px-3.5 py-2 rounded-xl text-sm font-semibold border transition-all ${vault.key === v.key ? "bg-blue-600 text-white border-blue-600" : "bg-white text-slate-600 border-slate-200 hover:border-blue-300"}`}>{v.name} · {(v.apy * 100).toFixed(1)}%</button>
+          ))}
+        </div>
+      </div>
+      <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl p-6 text-white flex flex-col justify-between">
+        <div>
+          <p className="text-xs text-blue-100 uppercase tracking-wider">Live projected earnings</p>
+          <p className="font-mono text-3xl sm:text-4xl font-bold mt-1 tabular-nums" data-testid="calc-live">{money(live, 6)}</p>
+          <p className="text-xs text-blue-200">XRP since you opened this page</p>
+        </div>
+        <div className="grid grid-cols-3 gap-3 mt-6">
+          <div className="bg-white/10 border border-white/20 rounded-xl p-3"><p className="text-[10px] text-blue-100 uppercase">Daily</p><p className="font-mono font-bold">{money(perYear / 365)}</p></div>
+          <div className="bg-white/10 border border-white/20 rounded-xl p-3"><p className="text-[10px] text-blue-100 uppercase">Monthly</p><p className="font-mono font-bold">{money(perYear / 12)}</p></div>
+          <div className="bg-white/10 border border-white/20 rounded-xl p-3"><p className="text-[10px] text-blue-100 uppercase">Yearly</p><p className="font-mono font-bold">{money(perYear)}</p></div>
+        </div>
+        <p className="text-[11px] text-blue-200 mt-4">Illustrative only. Yields depend on vault terms and are not guaranteed.</p>
+      </div>
+    </div>
+  );
+}
+
 export default function Landing() {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
@@ -264,6 +340,40 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Yield calculator */}
+      <section id="calculator" className="max-w-6xl mx-auto px-4 sm:px-6 pb-20 sm:pb-28">
+        <div className="max-w-2xl mb-10">
+          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-blue-600">Yield calculator</p>
+          <h2 className="text-3xl sm:text-4xl font-bold mt-3 text-slate-900">See what your XRP could earn.</h2>
+          <p className="text-slate-500 mt-4 leading-relaxed">Set an amount, pick a vault, and watch the projected yield update live — figures are illustrative, based on each vault's fixed APY.</p>
+        </div>
+        <YieldCalculator />
+      </section>
+
+      {/* VIP Tiers */}
+      <section id="tiers" className="border-y border-slate-200 bg-[#F7F9FC] py-20 sm:py-28">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="max-w-2xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-blue-600">VIP tiers</p>
+            <h2 className="text-3xl sm:text-4xl font-bold mt-3 text-slate-900">Rewards that scale with you.</h2>
+            <p className="text-slate-500 mt-4 leading-relaxed">Your tier unlocks automatically as your total staked XRP grows — and each tier opens a higher-yield vault.</p>
+          </div>
+          <div className="mt-10 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="hidden sm:grid grid-cols-4 px-6 py-4 border-b border-slate-100 text-xs font-semibold uppercase tracking-wider text-slate-400">
+              <span>Tier</span><span>Min staked</span><span>Flagship vault</span><span className="text-right">Lock</span>
+            </div>
+            {TIERS_TABLE.map((t) => (
+              <div key={t.tier} className="grid grid-cols-2 sm:grid-cols-4 gap-2 px-6 py-4 border-b border-slate-50 last:border-0 items-center">
+                <span className="flex items-center gap-2 font-semibold text-slate-900"><Crown size={15} style={{ color: t.color }} /> {t.tier}</span>
+                <span className="font-mono text-slate-600">{t.min} XRP</span>
+                <span className="text-slate-600 text-sm">{t.flagship}</span>
+                <span className="sm:text-right text-slate-500 text-sm">{t.lock}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* How it works */}
       <section id="how" className="max-w-6xl mx-auto px-4 sm:px-6 pb-20 sm:pb-28">
         <div className="max-w-2xl">
@@ -305,6 +415,26 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Education — how yield works */}
+      <section id="learn" className="max-w-6xl mx-auto px-4 sm:px-6 py-20 sm:py-28">
+        <div className="max-w-2xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-blue-600">Learn</p>
+          <h2 className="text-3xl sm:text-4xl font-bold mt-3 text-slate-900">How staking yield works.</h2>
+          <p className="text-slate-500 mt-4 leading-relaxed">New to staking? Here's the short version — no jargon, just how your XRP goes to work.</p>
+        </div>
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mt-12">
+          {EDU.map((e, i) => (
+            <motion.div key={e.title} variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} custom={i} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm glow-card">
+              <div className="w-11 h-11 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center mb-4">
+                <e.icon size={20} className="text-blue-600" />
+              </div>
+              <h3 className="font-semibold text-slate-900">{e.title}</h3>
+              <p className="text-sm text-slate-500 mt-2 leading-relaxed">{e.text}</p>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
       {/* Self custody CTA */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-20 sm:py-28 text-center">
         <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
@@ -318,7 +448,7 @@ export default function Landing() {
       </section>
 
       {/* FAQ */}
-      <section className="max-w-3xl mx-auto px-4 sm:px-6 pb-20 sm:pb-28">
+      <section id="faq" className="max-w-3xl mx-auto px-4 sm:px-6 pb-20 sm:pb-28">
         <h2 className="text-3xl sm:text-4xl font-bold text-center mb-10 text-slate-900">Questions, answered.</h2>
         <Accordion type="single" collapsible className="space-y-3" data-testid="faq-accordion">
           {FAQS.map((f, i) => (
@@ -342,16 +472,59 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <Logo size={28} />
-          <div className="flex items-center gap-6 text-sm text-slate-500">
-            <Link to="/whitepaper" className="hover:text-slate-900">Whitepaper</Link>
-            <a href="#features" className="hover:text-slate-900">Features</a>
-            <a href="#vaults" className="hover:text-slate-900">Vaults</a>
-            <a href="#security" className="hover:text-slate-900">Security</a>
+      <footer className="bg-[#070A12] text-slate-400">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16">
+          <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-5">
+            <div className="lg:col-span-2">
+              <div className="flex items-center gap-2.5">
+                <img src="/icon-512.png" alt="XamanProtocol" className="w-9 h-9 rounded-lg ring-1 ring-white/10" />
+                <span className="text-lg font-bold text-white">Xaman<span className="text-blue-500">Protocol</span></span>
+              </div>
+              <p className="mt-4 text-sm leading-relaxed max-w-xs text-slate-400">A private, invite-only, non-custodial VIP staking wallet for XRP. Your keys, your yield — live, in your pocket.</p>
+              <div className="flex gap-3 mt-6">
+                <a href="https://x.com" target="_blank" rel="noreferrer" aria-label="Twitter" data-testid="footer-social-x" className="w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-colors"><Twitter size={16} /></a>
+                <a href="https://t.me" target="_blank" rel="noreferrer" aria-label="Telegram" data-testid="footer-social-telegram" className="w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-colors"><Send size={16} /></a>
+                <a href="mailto:support@xamanprotocol.app" aria-label="Email" data-testid="footer-social-mail" className="w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-colors"><Mail size={16} /></a>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-white font-semibold text-sm mb-4">Product</h4>
+              <ul className="space-y-3 text-sm">
+                <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
+                <li><a href="#calculator" className="hover:text-white transition-colors">Yield calculator</a></li>
+                <li><a href="#tiers" className="hover:text-white transition-colors">VIP tiers</a></li>
+                <li><a href="#vaults" className="hover:text-white transition-colors">Vaults</a></li>
+                <li><a href="#how" className="hover:text-white transition-colors">How it works</a></li>
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="text-white font-semibold text-sm mb-4">Resources</h4>
+              <ul className="space-y-3 text-sm">
+                <li><Link to="/whitepaper" className="hover:text-white transition-colors">Whitepaper</Link></li>
+                <li><a href="#learn" className="hover:text-white transition-colors">Learn staking</a></li>
+                <li><a href="#security" className="hover:text-white transition-colors">Security</a></li>
+                <li><a href="#faq" className="hover:text-white transition-colors">FAQ</a></li>
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="text-white font-semibold text-sm mb-4">Get started</h4>
+              <ul className="space-y-3 text-sm">
+                <li><Link to="/create" data-testid="footer-create" className="hover:text-white transition-colors">Create wallet</Link></li>
+                <li><Link to="/recover" className="hover:text-white transition-colors">I have a phrase</Link></li>
+                <li><a href="mailto:support@xamanprotocol.app" className="hover:text-white transition-colors">Contact support</a></li>
+              </ul>
+            </div>
           </div>
-          <p className="text-xs text-slate-400">© {new Date().getFullYear()} XamanProtocol. Non-custodial. XRP-first.</p>
+
+          <div className="mt-14 pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-xs text-slate-500 max-w-xl text-center sm:text-left">Staking involves risk. Projected yields are illustrative and not guaranteed. XamanProtocol is a private, invite-only platform and does not provide financial advice. © {new Date().getFullYear()} XamanProtocol — Non-custodial · XRP-first.</p>
+            <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} data-testid="footer-back-to-top" className="shrink-0 flex items-center gap-1.5 text-xs font-semibold text-white bg-white/10 hover:bg-white/20 border border-white/10 rounded-lg px-3.5 py-2.5 transition-colors">
+              <ArrowUp size={13} /> Back to top
+            </button>
+          </div>
         </div>
       </footer>
     </div>
