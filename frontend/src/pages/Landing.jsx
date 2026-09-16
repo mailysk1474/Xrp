@@ -474,8 +474,8 @@ export default function Landing() {
       {/* Footer */}
       <footer className="bg-[#070A12] text-slate-400">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16">
-          <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-5">
-            <div className="lg:col-span-2">
+          <div className="flex flex-col lg:flex-row lg:justify-between gap-12">
+            <div className="max-w-sm">
               <div className="flex items-center gap-2.5">
                 <img src="/icon-512.png" alt="XamanProtocol" className="w-9 h-9 rounded-lg ring-1 ring-white/10" />
                 <span className="text-lg font-bold text-white">Xaman<span className="text-blue-500">Protocol</span></span>
@@ -488,6 +488,7 @@ export default function Landing() {
               </div>
             </div>
 
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-10 sm:gap-16 lg:gap-20">
             <div>
               <h4 className="text-white font-semibold text-sm mb-4">Product</h4>
               <ul className="space-y-3 text-sm">
@@ -516,6 +517,7 @@ export default function Landing() {
                 <li><Link to="/recover" className="hover:text-white transition-colors">I have a phrase</Link></li>
                 <li><a href="mailto:support@xamanprotocol.app" className="hover:text-white transition-colors">Contact support</a></li>
               </ul>
+            </div>
             </div>
           </div>
 
