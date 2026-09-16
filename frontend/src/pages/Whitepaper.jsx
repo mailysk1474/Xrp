@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Logo } from "@/components/Logo";
-import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ShieldCheck, FileText } from "lucide-react";
 
 const VAULTS = [
   { n: "XRP Flex", apy: "5.2%", term: "Flexible", tier: "All members" },
@@ -40,6 +40,9 @@ export default function Whitepaper() {
           </div>
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-slate-900">XamanProtocol Whitepaper</h1>
           <p className="text-slate-500 mt-4 text-lg leading-relaxed">A private, non-custodial VIP staking protocol for XRP — engineered for security, transparency, and live yield.</p>
+          <a href="/whitepaper.pdf" target="_blank" rel="noreferrer" data-testid="whitepaper-download-pdf" className="inline-flex items-center gap-2 mt-6 bg-slate-900 hover:bg-slate-800 text-white font-semibold px-5 py-3 rounded-xl glow-blue transition-all active:scale-95">
+            <FileText size={17} /> Download PDF
+          </a>
         </motion.div>
 
         <div className="my-10 rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">

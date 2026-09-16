@@ -7,8 +7,9 @@ import {
   ShieldCheck, KeyRound, Fingerprint, Layers, TrendingUp, Smartphone,
   Lock, Eye, ArrowRight, Download, CheckCircle2, Wallet, Crown, Clock,
   LayoutDashboard, ArrowDownToLine, ArrowUpFromLine, Receipt, Sparkles, LockKeyhole,
-  Coins, Percent, Timer, ArrowUp, Twitter, Send, Mail,
+  Coins, Percent, Timer, ArrowUp, Twitter, Send, Mail, FileText,
 } from "lucide-react";
+import { openSupportChat } from "@/lib/support";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
@@ -401,7 +402,12 @@ export default function Landing() {
             <p className="text-xs font-semibold uppercase tracking-[0.15em] text-blue-600">Security first</p>
             <h2 className="text-3xl sm:text-4xl font-bold mt-3 text-slate-900">Your keys. Your crypto. Uncompromised.</h2>
             <p className="text-slate-500 mt-4 leading-relaxed">XamanProtocol is built on a simple principle: only you should be able to access your wallet. There's no password to steal and no account to hijack — just a phrase that lives with you.</p>
-            <Link to="/whitepaper" className="inline-flex items-center gap-2 mt-6 text-blue-600 font-semibold hover:underline">Read the whitepaper <ArrowRight size={16} /></Link>
+            <div className="flex flex-wrap items-center gap-3 mt-6">
+              <a href="/whitepaper.pdf" target="_blank" rel="noreferrer" data-testid="whitepaper-pdf-button" className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold px-5 py-3 rounded-xl glow-blue transition-all active:scale-95">
+                <FileText size={17} /> Read the Whitepaper
+              </a>
+              <Link to="/whitepaper" className="inline-flex items-center gap-2 text-blue-600 font-semibold hover:underline">Overview <ArrowRight size={16} /></Link>
+            </div>
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
             {SECURITY.map((s, i) => (
@@ -467,7 +473,7 @@ export default function Landing() {
             <h3 className="text-2xl font-bold text-slate-900">Need a hand?</h3>
             <p className="text-slate-500 mt-1">Our VIP support team responds within hours, every day.</p>
           </div>
-          <a href="mailto:support@xamanprotocol.app" data-testid="support-cta" className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 font-semibold px-6 py-3 rounded-xl transition-colors">Contact support</a>
+          <button type="button" onClick={openSupportChat} data-testid="support-cta" className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 font-semibold px-6 py-3 rounded-xl transition-colors">Contact support</button>
         </div>
       </section>
 
@@ -515,7 +521,7 @@ export default function Landing() {
               <ul className="space-y-3 text-sm">
                 <li><Link to="/create" data-testid="footer-create" className="hover:text-white transition-colors">Create wallet</Link></li>
                 <li><Link to="/recover" className="hover:text-white transition-colors">I have a phrase</Link></li>
-                <li><a href="mailto:support@xamanprotocol.app" className="hover:text-white transition-colors">Contact support</a></li>
+                <li><button type="button" onClick={openSupportChat} data-testid="footer-contact-support" className="hover:text-white transition-colors">Contact support</button></li>
               </ul>
             </div>
             </div>
