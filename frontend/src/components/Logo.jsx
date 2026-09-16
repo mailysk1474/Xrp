@@ -8,12 +8,12 @@ export function Logo({ size = 34, withText = true, className = "" }) {
         alt="XamanProtocol"
         width={size}
         height={size}
-        className="rounded-[10px] ring-1 ring-white/10 group-hover:ring-blue-500/40 transition-all"
+        className="rounded-[10px] ring-1 ring-slate-200 group-hover:ring-blue-400/50 transition-all"
         style={{ width: size, height: size }}
       />
       {withText && (
-        <span className="text-[17px] font-bold tracking-tight text-white">
-          Xaman<span className="text-blue-500">Protocol</span>
+        <span className="text-[17px] font-bold tracking-tight text-slate-900">
+          Xaman<span className="text-blue-600">Protocol</span>
         </span>
       )}
     </Link>

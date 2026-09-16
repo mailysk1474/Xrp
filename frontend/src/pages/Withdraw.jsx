@@ -35,52 +35,30 @@ export default function Withdraw() {
   return (
     <div className="max-w-lg mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Withdraw XRP</h1>
-        <p className="text-sm text-slate-400 mt-1">Request a withdrawal. Each request is manually approved by an admin.</p>
+        <h1 className="text-2xl font-bold text-slate-900">Withdraw XRP</h1>
+        <p className="text-sm text-slate-500 mt-1">Request a withdrawal. Each request is manually approved by an admin.</p>
       </div>
 
       {blocked && (
-        <div className="flex items-center gap-3 rounded-2xl bg-red-500/10 border border-red-500/30 p-4" data-testid="withdraw-blocked-banner">
-          <AlertTriangle className="text-red-400 shrink-0" size={20} />
-          <p className="text-sm text-red-200">
-            {locked ? "Your wallet is locked. Withdrawals are disabled." : "Withdrawals are currently disabled for your account."}
-          </p>
+        <div className="flex items-center gap-3 rounded-2xl bg-red-50 border border-red-200 p-4" data-testid="withdraw-blocked-banner">
+          <AlertTriangle className="text-red-500 shrink-0" size={20} />
+          <p className="text-sm text-red-700">{locked ? "Your wallet is locked. Withdrawals are disabled." : "Withdrawals are currently disabled for your account."}</p>
         </div>
       )}
 
-      <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="bg-[#121824] border border-white/10 rounded-2xl p-6 space-y-4">
-        <div className="flex items-center justify-between bg-[#0B0E17] rounded-xl px-4 py-3">
-          <span className="text-sm text-slate-400">Available balance</span>
-          <span className="font-mono font-semibold text-white" data-testid="withdraw-available">{fmtXRP(balance)} XRP</span>
+      <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm">
+        <div className="flex items-center justify-between bg-slate-50 rounded-xl px-4 py-3">
+          <span className="text-sm text-slate-500">Available balance</span>
+          <span className="font-mono font-semibold text-slate-900" data-testid="withdraw-available">{fmtXRP(balance)} XRP</span>
         </div>
         <div>
-          <label className="text-xs font-semibold uppercase tracking-wider text-blue-400/90">Amount (XRP)</label>
+          <label className="text-xs font-semibold uppercase tracking-wider text-blue-600">Amount (XRP)</label>
           <div className="relative mt-1.5">
-            <input
-              data-testid="withdraw-amount-input"
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              disabled={blocked}
-              className="w-full bg-[#0B0E17] border border-white/15 focus:border-blue-500 rounded-xl px-4 py-3 pr-16 text-white outline-none font-mono disabled:opacity-50 transition-colors"
-              placeholder="0.00"
-            />
-            <button
-              onClick={() => setAmount(String(balance))}
-              disabled={blocked}
-              data-testid="withdraw-max-button"
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-semibold text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-lg disabled:opacity-40"
-            >
-              MAX
-            </button>
+            <input data-testid="withdraw-amount-input" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={blocked} className="w-full bg-slate-50 border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 rounded-xl px-4 py-3 pr-16 text-slate-900 outline-none font-mono disabled:opacity-50 transition-all" placeholder="0.00" />
+            <button onClick={() => setAmount(String(balance))} disabled={blocked} data-testid="withdraw-max-button" className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-semibold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg disabled:opacity-40">MAX</button>
           </div>
         </div>
-        <button
-          onClick={submit}
-          disabled={submitting || blocked}
-          data-testid="submit-withdraw-button"
-          className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-semibold py-3 rounded-xl glow-blue transition-all"
-        >
+        <button onClick={submit} disabled={submitting || blocked} data-testid="submit-withdraw-button" className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-semibold py-3 rounded-xl glow-blue transition-all">
           {submitting ? <Loader2 className="animate-spin" size={18} /> : <><ArrowUpFromLine size={17} /> Request withdrawal</>}
         </button>
       </motion.div>

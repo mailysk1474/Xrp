@@ -27,13 +27,13 @@ export function InstallPrompt() {
 
   return (
     <div
-      className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] w-[92%] max-w-md backdrop-blur-xl bg-[#101622]/95 border border-blue-500/30 rounded-2xl p-4 shadow-2xl glow-blue flex items-center gap-3"
+      className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] w-[92%] max-w-md bg-white border border-slate-200 rounded-2xl p-4 shadow-xl flex items-center gap-3"
       data-testid="install-prompt"
     >
       <img src="/icon-512.png" alt="" className="w-11 h-11 rounded-xl" />
       <div className="flex-1">
-        <p className="text-sm font-semibold text-white">Add to Home Screen</p>
-        <p className="text-xs text-slate-400">Install XamanProtocol for a native app feel.</p>
+        <p className="text-sm font-semibold text-slate-900">Add to Home Screen</p>
+        <p className="text-xs text-slate-500">Install XamanProtocol for a native app feel.</p>
       </div>
       <button
         onClick={install}
@@ -42,7 +42,7 @@ export function InstallPrompt() {
       >
         <Download size={15} /> Install
       </button>
-      <button onClick={() => setShow(false)} data-testid="install-dismiss-button" className="text-slate-500 hover:text-white p-1">
+      <button onClick={() => setShow(false)} data-testid="install-dismiss-button" className="text-slate-400 hover:text-slate-700 p-1">
         <X size={18} />
       </button>
     </div>

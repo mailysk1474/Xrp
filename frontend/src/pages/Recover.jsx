@@ -72,78 +72,42 @@ export default function Recover() {
     }
   };
 
+  const inputCls =
+    "mt-1.5 w-full bg-slate-50 border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 rounded-xl px-4 py-3 text-slate-900 placeholder-slate-400 outline-none transition-all";
+
   return (
     <AuthLayout back="/">
       {step === 0 ? (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-[#121824] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl"
-        >
-          <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mb-5">
-            <RotateCcw className="text-blue-400" size={22} />
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xl">
+          <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center mb-5">
+            <RotateCcw className="text-blue-600" size={22} />
           </div>
-          <h1 className="text-2xl font-bold text-white">Log in / Recover</h1>
-          <p className="text-sm text-slate-400 mt-2 mb-6">
-            Enter your username and 12-word recovery phrase to access your wallet on this device.
-          </p>
+          <h1 className="text-2xl font-bold text-slate-900">Log in / Recover</h1>
+          <p className="text-sm text-slate-500 mt-2 mb-6">Enter your username and 12-word recovery phrase to access your wallet on this device.</p>
           <form onSubmit={doLogin} className="space-y-4">
             <div>
-              <label className="text-xs font-semibold uppercase tracking-wider text-blue-400/90">Username</label>
-              <input
-                data-testid="recover-username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value.replace(/\s/g, ""))}
-                className="mt-1.5 w-full bg-[#0B0E17] border border-white/15 focus:border-blue-500 rounded-xl px-4 py-3 text-white outline-none font-mono transition-colors"
-                placeholder="ada_vip"
-              />
+              <label className="text-xs font-semibold uppercase tracking-wider text-blue-600">Username</label>
+              <input data-testid="recover-username" value={username} onChange={(e) => setUsername(e.target.value.replace(/\s/g, ""))} className={`${inputCls} font-mono`} placeholder="ada_vip" />
             </div>
             <div>
-              <label className="text-xs font-semibold uppercase tracking-wider text-blue-400/90">12-word recovery phrase</label>
-              <textarea
-                data-testid="recover-phrase"
-                value={phrase}
-                onChange={(e) => setPhrase(e.target.value)}
-                rows={3}
-                className="mt-1.5 w-full bg-[#0B0E17] border border-white/15 focus:border-blue-500 rounded-xl px-4 py-3 text-white outline-none font-mono text-sm resize-none transition-colors"
-                placeholder="word1 word2 word3 ..."
-              />
+              <label className="text-xs font-semibold uppercase tracking-wider text-blue-600">12-word recovery phrase</label>
+              <textarea data-testid="recover-phrase" value={phrase} onChange={(e) => setPhrase(e.target.value)} rows={3} className={`${inputCls} font-mono text-sm resize-none`} placeholder="word1 word2 word3 ..." />
             </div>
-            <button
-              type="submit"
-              disabled={loading}
-              data-testid="recover-submit-button"
-              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3.5 rounded-xl glow-blue disabled:opacity-60 active:scale-[0.99] transition-all"
-            >
+            <button type="submit" disabled={loading} data-testid="recover-submit-button" className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3.5 rounded-xl glow-blue disabled:opacity-60 active:scale-[0.99] transition-all">
               {loading ? <Loader2 className="animate-spin" size={18} /> : "Access wallet"}
             </button>
           </form>
           <p className="text-center text-sm text-slate-500 mt-5">
             No wallet yet?{" "}
-            <button onClick={() => navigate("/create")} data-testid="goto-create-link" className="text-blue-400 font-medium hover:underline">
-              Create one
-            </button>
+            <button onClick={() => navigate("/create")} data-testid="goto-create-link" className="text-blue-600 font-medium hover:underline">Create one</button>
           </p>
         </motion.div>
       ) : (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-[#121824] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl text-center"
-        >
-          <h1 className="text-2xl font-bold text-white">{pinStage === 0 ? "Set a PIN" : "Confirm PIN"}</h1>
-          <p className="text-sm text-slate-400 mt-2 mb-7">Secure this device with a 4-digit PIN.</p>
-          {pinStage === 0 ? (
-            <PinInput value={pin} onChange={setPin} onComplete={finishPin} testid="setup-pin" />
-          ) : (
-            <PinInput value={pin2} onChange={setPin2} onComplete={finishPin} testid="confirm-pin" />
-          )}
-          <button
-            disabled={loading || (pinStage === 0 ? pin.length !== 4 : pin2.length !== 4)}
-            onClick={finishPin}
-            data-testid="recover-pin-continue"
-            className="w-full mt-8 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-semibold py-3.5 rounded-xl glow-blue transition-all"
-          >
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xl text-center">
+          <h1 className="text-2xl font-bold text-slate-900">{pinStage === 0 ? "Set a PIN" : "Confirm PIN"}</h1>
+          <p className="text-sm text-slate-500 mt-2 mb-7">Secure this device with a 4-digit PIN.</p>
+          {pinStage === 0 ? <PinInput value={pin} onChange={setPin} onComplete={finishPin} testid="setup-pin" /> : <PinInput value={pin2} onChange={setPin2} onComplete={finishPin} testid="confirm-pin" />}
+          <button disabled={loading || (pinStage === 0 ? pin.length !== 4 : pin2.length !== 4)} onClick={finishPin} data-testid="recover-pin-continue" className="w-full mt-8 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-semibold py-3.5 rounded-xl glow-blue transition-all">
             {loading ? <Loader2 className="animate-spin" size={18} /> : pinStage === 0 ? "Set PIN" : "Enter wallet"}
           </button>
         </motion.div>

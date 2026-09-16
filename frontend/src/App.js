@@ -31,8 +31,8 @@ function Protected({ children, adminOnly = false }) {
 
 function FullLoader() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#07090E]">
-      <div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+    <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="w-10 h-10 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
     </div>
   );
 }
@@ -79,7 +79,7 @@ function App() {
         <BrowserRouter>
           <AppRoutes />
           <InstallPrompt />
-          <Toaster position="top-center" theme="dark" richColors />
+          <Toaster position="top-center" theme="light" richColors />
         </BrowserRouter>
       </AuthProvider>
     </div>

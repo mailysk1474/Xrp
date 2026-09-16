@@ -21,12 +21,12 @@ export function fmtDate(iso) {
 }
 
 export const TIER_META = {
-  starter: { label: "Starter", color: "#94A3B8", badge: "rgba(148,163,184,0.12)", border: "rgba(148,163,184,0.3)" },
-  flex: { label: "Flex", color: "#38BDF8", badge: "rgba(56,189,248,0.12)", border: "rgba(56,189,248,0.3)" },
-  silver: { label: "Silver", color: "#CBD5E1", badge: "rgba(203,213,225,0.12)", border: "rgba(203,213,225,0.3)" },
-  gold: { label: "Gold", color: "#F59E0B", badge: "rgba(245,158,11,0.12)", border: "rgba(245,158,11,0.35)" },
-  platinum: { label: "Platinum", color: "#E2E8F0", badge: "rgba(226,232,240,0.15)", border: "rgba(226,232,240,0.4)" },
-  diamond: { label: "Diamond", color: "#A855F7", badge: "rgba(168,85,247,0.15)", border: "rgba(168,85,247,0.4)" },
+  starter: { label: "Starter", color: "#64748B", badge: "rgba(100,116,139,0.10)", border: "rgba(100,116,139,0.25)" },
+  flex: { label: "Flex", color: "#0284C7", badge: "rgba(2,132,199,0.10)", border: "rgba(2,132,199,0.25)" },
+  silver: { label: "Silver", color: "#64748B", badge: "rgba(100,116,139,0.10)", border: "rgba(148,163,184,0.35)" },
+  gold: { label: "Gold", color: "#D97706", badge: "rgba(217,119,6,0.10)", border: "rgba(217,119,6,0.30)" },
+  platinum: { label: "Platinum", color: "#475569", badge: "rgba(71,85,105,0.10)", border: "rgba(71,85,105,0.30)" },
+  diamond: { label: "Diamond", color: "#9333EA", badge: "rgba(147,51,234,0.10)", border: "rgba(147,51,234,0.30)" },
 };
 
 // Live per-second accrual rate for a stake, used for the ticking counter.
