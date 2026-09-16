@@ -55,92 +55,156 @@ const FAQS = [
   { q: "Do I need to install anything?", a: "No — it runs in your browser. For the best experience you can add it to your home screen and launch it full-screen like a native app." },
 ];
 
-/* Faithful mini version of the real user dashboard */
-function PhoneMock() {
+/* Mac + phone device cluster mirroring the real dashboard */
+function MacMock() {
   return (
-    <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: "easeOut" }} className="relative mx-auto w-[300px] animate-float">
-      <div className="rounded-[2.8rem] border-[7px] border-slate-900 bg-slate-900 p-1.5 shadow-2xl" style={{ boxShadow: "0 40px 80px -24px rgba(37,99,235,0.4)" }}>
-        <div className="rounded-[2.1rem] overflow-hidden bg-[#F7F9FC] border border-slate-200">
-          {/* status + top bar */}
-          <div className="bg-white border-b border-slate-100">
-            <div className="h-5 flex items-center justify-center"><div className="w-16 h-1 rounded-full bg-slate-200" /></div>
-            <div className="flex items-center justify-between px-3.5 pb-2.5">
+    <div className="w-full">
+      {/* lid / screen */}
+      <div className="rounded-t-2xl border-[8px] border-b-0 border-slate-900 bg-slate-900 shadow-2xl" style={{ boxShadow: "0 45px 90px -30px rgba(37,99,235,0.45)" }}>
+        <div className="rounded-t-lg overflow-hidden bg-[#F7F9FC]">
+          {/* browser chrome */}
+          <div className="flex items-center gap-1.5 px-3 h-7 bg-white border-b border-slate-100">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#FF5F57]" />
+            <span className="w-2.5 h-2.5 rounded-full bg-[#FEBC2E]" />
+            <span className="w-2.5 h-2.5 rounded-full bg-[#28C840]" />
+            <div className="ml-3 flex items-center gap-1.5 bg-slate-100 rounded-md px-2 py-0.5">
+              <Lock size={8} className="text-slate-400" />
+              <span className="text-[8px] font-medium text-slate-500">app.xamanprotocol.io</span>
+            </div>
+          </div>
+
+          {/* dashboard */}
+          <div className="p-3.5">
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-1.5">
                 <img src="/icon-512.png" alt="" className="w-5 h-5 rounded-md" />
                 <span className="text-[11px] font-bold text-slate-900">Xaman<span className="text-blue-600">Protocol</span></span>
               </div>
-              <div className="flex items-center gap-1 text-[8px] text-slate-500 border border-slate-200 rounded-md px-1.5 py-0.5"><Lock size={8} /> Lock</div>
-            </div>
-          </div>
-
-          <div className="p-3.5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[8px] text-slate-400">Welcome back,</p>
-                <p className="text-[12px] font-bold text-slate-900 leading-tight">Ada Lovelace</p>
-              </div>
               <span className="flex items-center gap-1 text-[8px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200"><Crown size={8} /> Diamond</span>
             </div>
 
-            {/* balance hero */}
-            <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 p-3.5">
-              <p className="text-[8px] text-blue-100 uppercase tracking-wider">Available Balance</p>
-              <p className="font-mono text-[22px] font-bold text-white leading-tight mt-0.5">128,450.<span className="text-blue-200 text-base">00</span> <span className="text-[10px] text-blue-200">XRP</span></p>
-              <div className="flex items-center gap-1 mt-1 text-[9px]">
-                <TrendingUp size={9} className="text-emerald-300" />
-                <span className="text-blue-100">Live yield</span>
-                <span className="font-mono text-white">312.884201</span>
+            <div className="grid grid-cols-5 gap-3">
+              {/* balance hero */}
+              <div className="col-span-3 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 p-3.5">
+                <p className="text-[8px] text-blue-100 uppercase tracking-wider">Available Balance</p>
+                <p className="font-mono text-[22px] font-bold text-white leading-tight mt-0.5">128,450.<span className="text-blue-200 text-base">00</span></p>
+                <div className="flex items-center gap-1 mt-1 text-[9px]">
+                  <TrendingUp size={9} className="text-emerald-300" />
+                  <span className="text-blue-100">Live yield</span>
+                  <span className="font-mono text-white">312.884201</span>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5 mt-3">
+                  <div className="bg-white rounded-lg text-center py-1.5 text-blue-700 text-[9px] font-semibold">Deposit</div>
+                  <div className="bg-slate-900 rounded-lg text-center py-1.5 text-white text-[9px] font-semibold">Withdraw</div>
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-1.5 mt-2.5">
-                <div className="bg-white rounded-lg text-center py-1.5 text-blue-700 text-[9px] font-semibold">Deposit</div>
-                <div className="bg-slate-900 rounded-lg text-center py-1.5 text-white text-[9px] font-semibold">Withdraw</div>
-              </div>
-            </div>
-
-            {/* stat cards */}
-            <div className="grid grid-cols-3 gap-1.5">
-              <div className="bg-white border border-slate-200 rounded-xl p-2">
-                <p className="text-[7px] text-slate-400 uppercase">Staked</p>
-                <p className="font-mono text-[11px] font-bold text-slate-900">100k</p>
-              </div>
-              <div className="bg-white border border-slate-200 rounded-xl p-2">
-                <p className="text-[7px] text-slate-400 uppercase">Profit</p>
-                <p className="font-mono text-[11px] font-bold text-emerald-600">312.8</p>
-              </div>
-              <div className="bg-white border border-slate-200 rounded-xl p-2">
-                <p className="text-[7px] text-slate-400 uppercase">Vaults</p>
-                <p className="font-mono text-[11px] font-bold text-slate-900">2</p>
+              {/* side stats */}
+              <div className="col-span-2 flex flex-col gap-2">
+                <div className="bg-white border border-slate-200 rounded-xl p-2.5 flex-1">
+                  <p className="text-[7px] text-slate-400 uppercase">Total Staked</p>
+                  <p className="font-mono text-[13px] font-bold text-slate-900 mt-0.5">100k <span className="text-[8px] text-slate-400">XRP</span></p>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-xl p-2.5 flex-1">
+                  <p className="text-[7px] text-slate-400 uppercase">Total Profit</p>
+                  <p className="font-mono text-[13px] font-bold text-emerald-600 mt-0.5">312.88 <span className="text-[8px] text-slate-400">XRP</span></p>
+                </div>
               </div>
             </div>
 
-            {/* active stake */}
-            <div className="bg-white border border-slate-200 rounded-xl p-2.5">
+            {/* active stake row */}
+            <div className="bg-white border border-slate-200 rounded-xl p-2.5 mt-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <div className="w-6 h-6 rounded-lg bg-purple-100 flex items-center justify-center"><Layers size={11} className="text-purple-600" /></div>
                   <div>
                     <p className="text-[10px] font-semibold text-slate-900 leading-none">VIP Diamond</p>
-                    <p className="text-[8px] text-slate-400 font-mono">156% APY · 90d lock</p>
+                    <p className="text-[8px] text-slate-400 font-mono mt-0.5">156% APY · 90d lock</p>
                   </div>
                 </div>
-                <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200">Active</span>
-              </div>
-              <div className="flex items-center justify-between mt-2 px-2 py-1 rounded-lg bg-blue-50 border border-blue-100">
-                <span className="text-[8px] text-slate-500 flex items-center gap-1"><Clock size={8} /> Unlocks in</span>
-                <span className="font-mono text-[9px] font-semibold text-blue-600">62d 4h 11m</span>
+                <div className="flex items-center gap-2 px-2 py-1 rounded-lg bg-blue-50 border border-blue-100">
+                  <span className="text-[8px] text-slate-500 flex items-center gap-1"><Clock size={8} /> Unlocks in</span>
+                  <span className="font-mono text-[9px] font-semibold text-blue-600">62d 4h 11m</span>
+                </div>
               </div>
             </div>
           </div>
-
-          {/* bottom nav */}
-          <div className="grid grid-cols-5 border-t border-slate-200 bg-white/95">
-            {[{ i: LayoutDashboard, a: true }, { i: Layers }, { i: ArrowDownToLine }, { i: ArrowUpFromLine }, { i: Receipt }].map((n, k) => (
-              <div key={k} className={`flex justify-center py-2 ${n.a ? "text-blue-600" : "text-slate-300"}`}><n.i size={15} /></div>
-            ))}
-          </div>
         </div>
       </div>
-    </motion.div>
+      {/* base / hinge */}
+      <div className="relative">
+        <div className="h-2.5 bg-gradient-to-b from-slate-300 to-slate-500 rounded-b-md w-[calc(100%+34px)] -ml-[17px] shadow-md" />
+        <div className="mx-auto -mt-2.5 w-24 h-2.5 rounded-b-lg bg-slate-500/80" />
+      </div>
+    </div>
+  );
+}
+
+function SlimPhone() {
+  return (
+    <div className="rounded-[2rem] border-[6px] border-slate-900 bg-slate-900 p-1 shadow-2xl" style={{ boxShadow: "0 30px 60px -18px rgba(15,23,42,0.5)" }}>
+      <div className="rounded-[1.5rem] overflow-hidden bg-[#F7F9FC]">
+        {/* notch */}
+        <div className="relative bg-white">
+          <div className="h-5 flex items-center justify-center"><div className="w-12 h-1.5 rounded-full bg-slate-900" /></div>
+        </div>
+        <div className="p-2.5 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[7px] text-slate-400">Welcome back,</p>
+              <p className="text-[10px] font-bold text-slate-900 leading-tight">Ada Lovelace</p>
+            </div>
+            <span className="flex items-center gap-0.5 text-[7px] px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200"><Crown size={7} /> VIP</span>
+          </div>
+
+          <div className="rounded-xl bg-gradient-to-br from-blue-600 to-blue-700 p-2.5">
+            <p className="text-[7px] text-blue-100 uppercase tracking-wider">Balance</p>
+            <p className="font-mono text-[16px] font-bold text-white leading-tight mt-0.5">128,450.<span className="text-blue-200 text-[11px]">00</span></p>
+            <div className="flex items-center gap-1 mt-0.5 text-[7px]">
+              <TrendingUp size={7} className="text-emerald-300" />
+              <span className="font-mono text-white">+312.884201</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1 mt-2">
+              <div className="bg-white rounded-md text-center py-1 text-blue-700 text-[8px] font-semibold">Deposit</div>
+              <div className="bg-slate-900 rounded-md text-center py-1 text-white text-[8px] font-semibold">Withdraw</div>
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-xl p-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1">
+                <div className="w-5 h-5 rounded-md bg-purple-100 flex items-center justify-center"><Layers size={9} className="text-purple-600" /></div>
+                <p className="text-[8px] font-semibold text-slate-900 leading-none">VIP Diamond</p>
+              </div>
+              <span className="text-[7px] px-1 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200">Active</span>
+            </div>
+            <div className="flex items-center justify-between mt-1.5 px-1.5 py-1 rounded-md bg-blue-50">
+              <span className="text-[7px] text-slate-500 flex items-center gap-0.5"><Clock size={7} /> Unlocks</span>
+              <span className="font-mono text-[8px] font-semibold text-blue-600">62d 4h</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-5 border-t border-slate-200 bg-white">
+          {[{ i: LayoutDashboard, a: true }, { i: Layers }, { i: ArrowDownToLine }, { i: ArrowUpFromLine }, { i: Receipt }].map((n, k) => (
+            <div key={k} className={`flex justify-center py-1.5 ${n.a ? "text-blue-600" : "text-slate-300"}`}><n.i size={12} /></div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* Mac (dashboard) with a slim phone overlapping in front */
+function PhoneMock() {
+  return (
+    <div className="relative mx-auto w-full max-w-[500px] pt-4 pb-8">
+      <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: "easeOut" }} className="w-[86%] ml-0">
+        <MacMock />
+      </motion.div>
+      <motion.div initial={{ opacity: 0, y: 30, x: 20 }} animate={{ opacity: 1, y: 0, x: 0 }} transition={{ duration: 0.8, delay: 0.15, ease: "easeOut" }} className="absolute right-0 bottom-0 w-[128px] animate-float z-10">
+        <SlimPhone />
+      </motion.div>
+    </div>
   );
 }
 

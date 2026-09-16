@@ -32,7 +32,7 @@ function ReinvestDialog({ open, onClose, profit, onDone }) {
     setBusy(true);
     try {
       const { data } = await api.post("/reinvest", { vault_key: selected.key });
-      toast.success(`Reinvested ${fmtXRP(data.amount)} XRP into ${selected.name}.`);
+      toast.success(`Restaked ${fmtXRP(data.amount)} XRP into ${selected.name}.`);
       onDone();
       onClose();
     } catch (err) {
@@ -45,7 +45,7 @@ function ReinvestDialog({ open, onClose, profit, onDone }) {
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="bg-white border-slate-200 text-slate-900 max-w-md" data-testid="reinvest-dialog">
-        <DialogHeader><DialogTitle className="text-xl">Reinvest your profit</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle className="text-xl">Restake your profit</DialogTitle></DialogHeader>
         <div className="space-y-4">
           <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 p-5 text-white">
             <p className="text-xs text-blue-100 uppercase tracking-wider">Available profit</p>
@@ -71,7 +71,7 @@ function ReinvestDialog({ open, onClose, profit, onDone }) {
           </div>
           <button onClick={confirm} disabled={busy || !selected || profit <= 0} data-testid="confirm-reinvest-button"
             className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold py-3 rounded-xl glow-blue transition-all">
-            {busy ? <Loader2 className="animate-spin" size={18} /> : <><Repeat size={16} /> Reinvest now</>}
+            {busy ? <Loader2 className="animate-spin" size={18} /> : <><Repeat size={16} /> Restake now</>}
           </button>
         </div>
       </DialogContent>
@@ -179,7 +179,7 @@ export default function Dashboard() {
           </p>
           {s.profit >= 10 && (
             <button onClick={() => setReinvestOpen(true)} data-testid="reinvest-button" className="mt-2.5 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg px-3 py-1.5 transition-colors">
-              <Repeat size={13} /> Reinvest profit
+              <Repeat size={13} /> Restake profit
             </button>
           )}
         </StatCard>
