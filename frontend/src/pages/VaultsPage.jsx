@@ -76,7 +76,7 @@ export default function VaultsPage() {
                   {v.duration_days ? <><Lock size={13} /> {v.duration_days}-day lock</> : <><Zap size={13} className="text-blue-500" /> Flexible term</>}
                 </div>
                 <div className="flex items-center gap-2 text-xs text-slate-500"><TrendingUp size={13} /> Min {fmtXRP(v.min_amount, 0)} XRP</div>
-                <button onClick={() => openStake(v)} disabled={!v.enabled} data-testid={`stake-button-${v.key}`} className="w-full mt-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-semibold py-2.5 rounded-xl transition-colors active:scale-[0.99]">Stake XRP</button>
+                <button onClick={() => openStake(v)} disabled={!v.enabled} data-testid={`stake-button-${v.key}`} className="w-full mt-3 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white font-semibold py-2.5 rounded-xl transition-colors active:scale-[0.99]">Stake XRP</button>
               </div>
             </motion.div>
           );
@@ -107,7 +107,7 @@ export default function VaultsPage() {
             </div>
           )}
           <DialogFooter>
-            <button onClick={submitStake} disabled={submitting} data-testid="confirm-stake-button" className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold py-3 rounded-xl glow-blue transition-all">
+            <button onClick={submitStake} disabled={submitting} data-testid="confirm-stake-button" className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-semibold py-3 rounded-xl glow-blue transition-all">
               {submitting ? <Loader2 className="animate-spin" size={18} /> : "Confirm stake"}
             </button>
           </DialogFooter>

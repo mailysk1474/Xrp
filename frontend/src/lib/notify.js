@@ -3,9 +3,11 @@ export function ensureNotifyPermission() {
   try {
     if (!("Notification" in window)) return;
     if (Notification.permission === "default") {
-      Notification.requestPermission().catch(() => {});
+      Notification.requestPermission().catch((e) => console.debug("notify permission request failed", e));
     }
-  } catch {}
+  } catch (e) {
+    console.debug("notifications unsupported", e);
+  }
 }
 
 export function notifyEnabled() {
@@ -17,5 +19,7 @@ export function pushNotify(title, body) {
     if (notifyEnabled()) {
       new Notification(title, { body, icon: "/icon-512.png", badge: "/icon-512.png" });
     }
-  } catch {}
+  } catch (e) {
+    console.debug("pushNotify failed", e);
+  }
 }

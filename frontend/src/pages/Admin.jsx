@@ -41,10 +41,10 @@ export default function Admin() {
         <h1 className="text-2xl font-bold text-slate-900 mb-5">Control Center</h1>
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="bg-white border border-slate-200 p-1 rounded-xl flex-wrap h-auto">
-            <TabsTrigger value="users" data-testid="admin-tab-users" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg text-slate-600"><Users size={15} className="mr-1.5" /> Users</TabsTrigger>
-            <TabsTrigger value="deposits" data-testid="admin-tab-deposits" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg text-slate-600"><ArrowDownToLine size={15} className="mr-1.5" /> Deposits</TabsTrigger>
-            <TabsTrigger value="withdrawals" data-testid="admin-tab-withdrawals" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg text-slate-600"><ArrowUpFromLine size={15} className="mr-1.5" /> Withdrawals</TabsTrigger>
-            <TabsTrigger value="audit" data-testid="admin-tab-audit" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg text-slate-600"><ScrollText size={15} className="mr-1.5" /> Audit</TabsTrigger>
+            <TabsTrigger value="users" data-testid="admin-tab-users" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white rounded-lg text-slate-600"><Users size={15} className="mr-1.5" /> Users</TabsTrigger>
+            <TabsTrigger value="deposits" data-testid="admin-tab-deposits" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white rounded-lg text-slate-600"><ArrowDownToLine size={15} className="mr-1.5" /> Deposits</TabsTrigger>
+            <TabsTrigger value="withdrawals" data-testid="admin-tab-withdrawals" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white rounded-lg text-slate-600"><ArrowUpFromLine size={15} className="mr-1.5" /> Withdrawals</TabsTrigger>
+            <TabsTrigger value="audit" data-testid="admin-tab-audit" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white rounded-lg text-slate-600"><ScrollText size={15} className="mr-1.5" /> Audit</TabsTrigger>
           </TabsList>
           <TabsContent value="users" className="mt-5"><UsersTab /></TabsContent>
           <TabsContent value="deposits" className="mt-5"><DepositsTab /></TabsContent>
@@ -179,7 +179,7 @@ function UserDetailDialog({ userId, onClose, onChange }) {
               <p className="text-xs font-semibold uppercase tracking-wider text-blue-600 mb-2">Add profit bonus</p>
               <div className="flex gap-2">
                 <input type="number" value={profitDelta} onChange={(e) => setProfitDelta(e.target.value)} data-testid="admin-profit-input" placeholder="Amount" className={`flex-1 ${insetInput}`} />
-                <button disabled={busy} onClick={() => act(() => api.post(`/admin/users/${userId}/adjust-profit`, { amount: parseFloat(profitDelta) || 0 }), "Profit adjusted")} data-testid="admin-profit-button" className="px-4 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold">Apply</button>
+                <button disabled={busy} onClick={() => act(() => api.post(`/admin/users/${userId}/adjust-profit`, { amount: parseFloat(profitDelta) || 0 }), "Profit adjusted")} data-testid="admin-profit-button" className="px-4 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold">Apply</button>
               </div>
             </div>
 

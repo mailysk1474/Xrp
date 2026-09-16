@@ -58,7 +58,7 @@ export default function Withdraw() {
             <button onClick={() => setAmount(String(balance))} disabled={blocked} data-testid="withdraw-max-button" className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-semibold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg disabled:opacity-40">MAX</button>
           </div>
         </div>
-        <button onClick={submit} disabled={submitting || blocked} data-testid="submit-withdraw-button" className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-semibold py-3 rounded-xl glow-blue transition-all">
+        <button onClick={submit} disabled={submitting || blocked} data-testid="submit-withdraw-button" className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white font-semibold py-3 rounded-xl glow-blue transition-all">
           {submitting ? <Loader2 className="animate-spin" size={18} /> : <><ArrowUpFromLine size={17} /> Request withdrawal</>}
         </button>
       </motion.div>

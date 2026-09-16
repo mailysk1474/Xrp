@@ -38,7 +38,7 @@ export function InstallPrompt() {
       <button
         onClick={install}
         data-testid="install-accept-button"
-        className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+        className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
       >
         <Download size={15} /> Install
       </button>

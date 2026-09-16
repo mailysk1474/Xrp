@@ -93,7 +93,7 @@ export default function Recover() {
               <label className="text-xs font-semibold uppercase tracking-wider text-blue-600">12-word recovery phrase</label>
               <textarea data-testid="recover-phrase" value={phrase} onChange={(e) => setPhrase(e.target.value)} rows={3} className={`${inputCls} font-mono text-sm resize-none`} placeholder="word1 word2 word3 ..." />
             </div>
-            <button type="submit" disabled={loading} data-testid="recover-submit-button" className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3.5 rounded-xl glow-blue disabled:opacity-60 active:scale-[0.99] transition-all">
+            <button type="submit" disabled={loading} data-testid="recover-submit-button" className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold py-3.5 rounded-xl glow-blue disabled:opacity-60 active:scale-[0.99] transition-all">
               {loading ? <Loader2 className="animate-spin" size={18} /> : "Access wallet"}
             </button>
           </form>
@@ -107,7 +107,7 @@ export default function Recover() {
           <h1 className="text-2xl font-bold text-slate-900">{pinStage === 0 ? "Set a PIN" : "Confirm PIN"}</h1>
           <p className="text-sm text-slate-500 mt-2 mb-7">Secure this device with a 4-digit PIN.</p>
           {pinStage === 0 ? <PinInput value={pin} onChange={setPin} onComplete={finishPin} testid="setup-pin" /> : <PinInput value={pin2} onChange={setPin2} onComplete={finishPin} testid="confirm-pin" />}
-          <button disabled={loading || (pinStage === 0 ? pin.length !== 4 : pin2.length !== 4)} onClick={finishPin} data-testid="recover-pin-continue" className="w-full mt-8 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-semibold py-3.5 rounded-xl glow-blue transition-all">
+          <button disabled={loading || (pinStage === 0 ? pin.length !== 4 : pin2.length !== 4)} onClick={finishPin} data-testid="recover-pin-continue" className="w-full mt-8 flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white font-semibold py-3.5 rounded-xl glow-blue transition-all">
             {loading ? <Loader2 className="animate-spin" size={18} /> : pinStage === 0 ? "Set PIN" : "Enter wallet"}
           </button>
         </motion.div>

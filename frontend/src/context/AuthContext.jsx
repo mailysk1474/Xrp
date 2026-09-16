@@ -64,7 +64,9 @@ export function AuthProvider({ children }) {
             refresh();
             window.dispatchEvent(new CustomEvent("xp-refresh", { detail: msg }));
           }
-        } catch {}
+        } catch (e) {
+          console.debug("ws message parse failed", e);
+        }
       };
       ws.onclose = () => {
         wsRef.current = null;
@@ -73,9 +75,11 @@ export function AuthProvider({ children }) {
         }, 4000);
       };
       ws.onerror = () => {
-        try { ws.close(); } catch {}
+        try { ws.close(); } catch (e) { console.debug("ws close failed", e); }
       };
-    } catch {}
+    } catch (e) {
+      console.debug("ws connect failed", e);
+    }
   }, [refresh]);
 
   const startLiveSync = useCallback(() => {

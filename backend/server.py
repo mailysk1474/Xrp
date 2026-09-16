@@ -7,7 +7,7 @@ load_dotenv(ROOT_DIR / '.env')
 import os
 import jwt
 import bcrypt
-import random
+import secrets
 import asyncio
 import logging
 from datetime import datetime, timezone, timedelta
@@ -111,6 +111,7 @@ def decode_token(token: str) -> dict:
 
 
 async def get_user_from_token(token: str) -> Optional[dict]:
+    user = None
     try:
         payload = decode_token(token)
     except Exception:
@@ -118,6 +119,7 @@ async def get_user_from_token(token: str) -> Optional[dict]:
     try:
         user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
     except Exception:
+        logger.debug("token->user lookup failed")
         return None
     return user
 
@@ -313,11 +315,11 @@ async def audit(admin: dict, action: str, target_user: str = None, detail: dict 
 
 async def unique_destination_tag() -> int:
     for _ in range(50):
-        tag = random.randint(100000000, 999999999)
+        tag = secrets.randbelow(900000000) + 100000000
         exists = await db.users.find_one({"destination_tag": tag})
         if not exists:
             return tag
-    return random.randint(100000000, 999999999)
+    return secrets.randbelow(900000000) + 100000000
 
 
 # ---------------------------------------------------------------------------
