@@ -53,7 +53,7 @@ export default function Whitepaper() {
                 <span className="font-medium text-slate-900">{v.n}</span>
                 <span className="text-slate-400 hidden sm:inline">{v.tier}</span>
                 <span className="text-slate-500">{v.term}</span>
-                <span className="font-mono font-bold text-blue-600">{v.apy}</span>
+                <span className="font-mono font-bold text-[#0030cf]">{v.apy}</span>
               </div>
             ))}
           </div>

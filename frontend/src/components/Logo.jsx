@@ -13,7 +13,7 @@ export function Logo({ size = 34, withText = true, className = "" }) {
       />
       {withText && (
         <span className="text-[17px] font-bold tracking-tight text-slate-900">
-          Xaman<span className="text-blue-600">Protocol</span>
+          Xaman<span className="text-[#0030cf]">Protocol</span>
         </span>
       )}
     </Link>

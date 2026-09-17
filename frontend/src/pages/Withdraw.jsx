@@ -52,10 +52,10 @@ export default function Withdraw() {
           <span className="font-mono font-semibold text-slate-900" data-testid="withdraw-available">{fmtXRP(balance)} XRP</span>
         </div>
         <div>
-          <label className="text-xs font-semibold uppercase tracking-wider text-blue-600">Amount (XRP)</label>
+          <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf]">Amount (XRP)</label>
           <div className="relative mt-1.5">
             <input data-testid="withdraw-amount-input" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={blocked} className="w-full bg-slate-50 border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 rounded-xl px-4 py-3 pr-16 text-slate-900 outline-none font-mono disabled:opacity-50 transition-all" placeholder="0.00" />
-            <button onClick={() => setAmount(String(balance))} disabled={blocked} data-testid="withdraw-max-button" className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-semibold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg disabled:opacity-40">MAX</button>
+            <button onClick={() => setAmount(String(balance))} disabled={blocked} data-testid="withdraw-max-button" className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#0030cf] bg-blue-50 px-2.5 py-1 rounded-lg disabled:opacity-40">MAX</button>
           </div>
         </div>
         <button onClick={submit} disabled={submitting || blocked} data-testid="submit-withdraw-button" className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-semibold py-3 rounded-xl glow-blue transition-all">

@@ -31,7 +31,7 @@ export function AppShell() {
               <NavLink
                 to="/admin"
                 data-testid="nav-admin-link"
-                className="hidden sm:flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors"
+                className="hidden sm:flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg bg-blue-50 text-[#0030cf] border border-blue-200 hover:bg-blue-100 transition-colors"
               >
                 <ShieldCheck size={14} /> Admin
               </NavLink>
@@ -57,7 +57,7 @@ export function AppShell() {
                 className={({ isActive }) =>
                   `flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                     isActive
-                      ? "text-blue-600 border-blue-600"
+                      ? "text-[#0030cf] border-blue-600"
                       : "text-slate-500 border-transparent hover:text-slate-900"
                   }`
                 }
@@ -84,7 +84,7 @@ export function AppShell() {
               data-testid={item.testid}
               className={({ isActive }) =>
                 `flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors ${
-                  isActive ? "text-blue-600" : "text-slate-400"
+                  isActive ? "text-[#0030cf]" : "text-slate-400"
                 }`
               }
             >

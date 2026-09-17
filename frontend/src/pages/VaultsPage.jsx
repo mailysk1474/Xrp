@@ -149,10 +149,10 @@ export default function VaultsPage() {
                 <span className="text-slate-900">{selected.duration_days ? `${selected.duration_days} days` : "Flexible"}</span>
               </div>
               <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-blue-600">Amount (XRP)</label>
+                <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf]">Amount (XRP)</label>
                 <div className="relative mt-1.5">
                   <input data-testid="stake-amount-input" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full bg-slate-50 border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 rounded-xl px-4 py-3 pr-16 text-slate-900 outline-none font-mono transition-all" placeholder={`Min ${fmtXRP(selected.min_amount, 0)}`} />
-                  <button onClick={() => setAmount(String(balance))} data-testid="stake-max-button" className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-semibold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg">MAX</button>
+                  <button onClick={() => setAmount(String(balance))} data-testid="stake-max-button" className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#0030cf] bg-blue-50 px-2.5 py-1 rounded-lg">MAX</button>
                 </div>
                 <p className="text-xs text-slate-400 mt-1.5">Available: {fmtXRP(balance)} XRP</p>
               </div>

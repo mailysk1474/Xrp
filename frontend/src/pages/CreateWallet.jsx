@@ -85,23 +85,23 @@ export default function CreateWallet() {
         {step === 0 && (
           <motion.div key="form" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xl">
             <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center mb-5">
-              <KeyRound className="text-blue-600" size={22} />
+              <KeyRound className="text-[#0030cf]" size={22} />
             </div>
             <h1 className="text-2xl font-bold text-slate-900">Create your wallet</h1>
             <p className="text-sm text-slate-500 mt-2 mb-6">Private VIP access. We'll generate a fresh 12-word wallet for you — no email, no password.</p>
             <form onSubmit={submitForm} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-blue-600">First name</label>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf]">First name</label>
                   <input data-testid="register-first-name" value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} className={inputCls} placeholder="Ada" />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-blue-600">Last name</label>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf]">Last name</label>
                   <input data-testid="register-last-name" value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} className={inputCls} placeholder="Lovelace" />
                 </div>
               </div>
               <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-blue-600">Username</label>
+                <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf]">Username</label>
                 <input data-testid="register-username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value.replace(/\s/g, "") })} className={`${inputCls} font-mono`} placeholder="ada_vip" />
                 <p className="text-xs text-slate-400 mt-1.5">Must be unique. This is how you log in with your phrase.</p>
               </div>
@@ -111,7 +111,7 @@ export default function CreateWallet() {
             </form>
             <p className="text-center text-sm text-slate-500 mt-5">
               Already have a phrase?{" "}
-              <button onClick={() => navigate("/recover")} data-testid="goto-recover-link" className="text-blue-600 font-medium hover:underline">Recover / log in</button>
+              <button onClick={() => navigate("/recover")} data-testid="goto-recover-link" className="text-[#0030cf] font-medium hover:underline">Recover / log in</button>
             </p>
           </motion.div>
         )}
@@ -134,7 +134,7 @@ export default function CreateWallet() {
               </div>
               {!revealed && (
                 <button onClick={() => setRevealed(true)} data-testid="reveal-phrase-button" className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-slate-900">
-                  <Eye size={26} className="text-blue-600" />
+                  <Eye size={26} className="text-[#0030cf]" />
                   <span className="text-sm font-medium">Tap to reveal</span>
                 </button>
               )}
@@ -158,7 +158,7 @@ export default function CreateWallet() {
         {step === 2 && (
           <motion.div key="pin" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xl text-center">
             <div className="w-12 h-12 mx-auto rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center mb-5">
-              <ShieldAlert className="text-blue-600" size={22} />
+              <ShieldAlert className="text-[#0030cf]" size={22} />
             </div>
             <h1 className="text-2xl font-bold text-slate-900">{pinStage === 0 ? "Set a PIN" : "Confirm your PIN"}</h1>
             <p className="text-sm text-slate-500 mt-2 mb-7">{pinStage === 0 ? "Your phrase is encrypted on this device behind this PIN." : "Enter your PIN again to confirm."}</p>

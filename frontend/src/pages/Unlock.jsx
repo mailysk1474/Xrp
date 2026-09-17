@@ -50,10 +50,10 @@ export default function Unlock() {
       <div className="flex-1 flex items-center justify-center px-4">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-8 shadow-xl text-center">
           <div className="w-16 h-16 mx-auto rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center mb-5">
-            <Fingerprint className="text-blue-600" size={30} />
+            <Fingerprint className="text-[#0030cf]" size={30} />
           </div>
           <h1 className="text-2xl font-bold text-slate-900">Welcome back</h1>
-          <p className="text-sm text-slate-500 mt-1.5 mb-8">Unlock <span className="text-blue-600 font-mono">@{vault.username}</span> with your PIN</p>
+          <p className="text-sm text-slate-500 mt-1.5 mb-8">Unlock <span className="text-[#0030cf] font-mono">@{vault.username}</span> with your PIN</p>
 
           <PinInput value={pin} onChange={setPin} onComplete={unlock} testid="unlock-pin" />
 
@@ -64,7 +64,7 @@ export default function Unlock() {
           </button>
 
           <div className="flex items-center justify-between mt-6 text-sm">
-            <button onClick={() => navigate("/recover")} data-testid="use-phrase-link" className="text-blue-600 hover:underline">Use recovery phrase</button>
+            <button onClick={() => navigate("/recover")} data-testid="use-phrase-link" className="text-[#0030cf] hover:underline">Use recovery phrase</button>
             <button onClick={() => { logout(); navigate("/"); }} data-testid="forget-wallet-link" className="text-slate-400 hover:text-red-500">Forget wallet</button>
           </div>
         </motion.div>

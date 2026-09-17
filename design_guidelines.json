@@ -39,7 +39,7 @@
       "glow_text": "#60A5FA"
     },
     "brand_accents": {
-      "electric_blue_primary": "#2563EB",
+      "electric_blue_primary": "#0030cf",
       "electric_blue_bright": "#3B82F6",
       "electric_blue_glow": "#60A5FA",
       "electric_cyan": "#06B6D4",
@@ -162,7 +162,7 @@
     "keyboard_nav": "Full support for Enter/Space triggers, ESC key modal dismissals, tab order across PIN login and registration steps."
   },
   "instructions_to_main_agent": [
-    "Ensure dark near-black aesthetic (#07090E) with bright electric blue accents (#2563EB / #3B82F6) and glowing borders across all pages.",
+    "Ensure dark near-black aesthetic (#07090E) with bright electric blue accents (#0030cf / #3B82F6) and glowing borders across all pages.",
     "Header and dropdowns MUST NEVER have completely transparent backgrounds; always use `backdrop-blur-xl bg-[#0D111A]/90 border border-white/10`.",
     "Implement data-testid on all interactive buttons, inputs, vault selection cards, tabs, and user profile actions.",
     "Ensure monetary values use JetBrains Mono or tabular nums so live profit ticking doesn't jitter layout.",

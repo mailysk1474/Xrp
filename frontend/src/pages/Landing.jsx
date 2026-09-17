@@ -78,7 +78,7 @@ function MacMock() {
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-1.5">
                 <img src="/icon-512.png" alt="" className="w-5 h-5 rounded-md" />
-                <span className="text-[11px] font-bold text-slate-900">Xaman<span className="text-blue-600">Protocol</span></span>
+                <span className="text-[11px] font-bold text-slate-900">Xaman<span className="text-[#0030cf]">Protocol</span></span>
               </div>
               <span className="flex items-center gap-1 text-[8px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200"><Crown size={8} /> Diamond</span>
             </div>
@@ -123,7 +123,7 @@ function MacMock() {
                 </div>
                 <div className="flex items-center gap-2 px-2 py-1 rounded-lg bg-blue-50 border border-blue-100">
                   <span className="text-[8px] text-slate-500 flex items-center gap-1"><Clock size={8} /> Unlocks in</span>
-                  <span className="font-mono text-[9px] font-semibold text-blue-600">62d 4h 11m</span>
+                  <span className="font-mono text-[9px] font-semibold text-[#0030cf]">62d 4h 11m</span>
                 </div>
               </div>
             </div>
@@ -190,18 +190,18 @@ function SlimPhone() {
                   <p className="text-[6px] text-slate-400 font-mono mt-0.5">156% APY</p>
                 </div>
               </div>
-              <span className="text-[6px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200">Active</span>
+              <span className="text-[6px] px-1.5 py-0.5 rounded-full bg-blue-50 text-[#0030cf] border border-blue-200">Active</span>
             </div>
             <div className="flex items-center justify-between mt-1.5 px-1.5 py-1 rounded-md bg-blue-50">
               <span className="text-[6px] text-slate-500 flex items-center gap-1"><Clock size={7} /> Unlocks in</span>
-              <span className="font-mono text-[7px] font-semibold text-blue-600">62d 4h 11m</span>
+              <span className="font-mono text-[7px] font-semibold text-[#0030cf]">62d 4h 11m</span>
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-5 border-t border-slate-200 bg-white">
           {[{ i: LayoutDashboard, a: true }, { i: Layers }, { i: ArrowDownToLine }, { i: ArrowUpFromLine }, { i: Receipt }].map((n, k) => (
-            <div key={k} className={`flex justify-center py-2 ${n.a ? "text-blue-600" : "text-slate-300"}`}><n.i size={11} /></div>
+            <div key={k} className={`flex justify-center py-2 ${n.a ? "text-[#0030cf]" : "text-slate-300"}`}><n.i size={11} /></div>
           ))}
         </div>
       </div>
@@ -273,10 +273,10 @@ function YieldCalculator() {
   return (
     <div className="grid lg:grid-cols-2 gap-6 bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm">
       <div>
-        <label className="text-xs font-semibold uppercase tracking-wider text-blue-600">Amount to stake (XRP)</label>
+        <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf]">Amount to stake (XRP)</label>
         <input type="number" value={amount} onChange={(e) => setAmount(Math.max(0, parseFloat(e.target.value) || 0))} data-testid="calc-amount" className="mt-1.5 w-full bg-slate-50 border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 rounded-xl px-4 py-3 text-slate-900 font-mono outline-none transition-all" />
         <input type="range" min="100" max="200000" step="100" value={Math.min(amount, 200000)} onChange={(e) => setAmount(parseFloat(e.target.value))} className="w-full mt-4 accent-blue-600" />
-        <p className="text-xs font-semibold uppercase tracking-wider text-blue-600 mt-6 mb-2">Choose a vault</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-[#0030cf] mt-6 mb-2">Choose a vault</p>
         <div className="flex flex-wrap gap-2">
           {CALC_VAULTS.map((v) => (
             <button key={v.key} onClick={() => setVault(v)} data-testid={`calc-vault-${v.key}`} className={`px-3.5 py-2 rounded-xl text-sm font-semibold border transition-all ${vault.key === v.key ? "bg-blue-600 text-white border-blue-600" : "bg-white text-slate-600 border-slate-200 hover:border-blue-300"}`}>{v.name} · {(v.apy * 100).toFixed(1)}%</button>
@@ -336,7 +336,7 @@ export default function Landing() {
               <Lock size={13} /> Private · Invite-only · Non-custodial
             </motion.div>
             <motion.h1 variants={fadeUp} initial="hidden" animate="show" custom={1} className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.05] text-slate-900">
-              Your VIP staking wallet, <span className="text-blue-600">self-custody</span> in your pocket.
+              Your VIP staking wallet, <span className="text-[#0030cf]">self-custody</span> in your pocket.
             </motion.h1>
             <motion.p variants={fadeUp} initial="hidden" animate="show" custom={2} className="text-lg text-slate-500 mt-6 max-w-lg leading-relaxed">
               Generate a private wallet in seconds, stake XRP into premium vaults, and watch your yield accrue live — secured by a PIN only you control.
@@ -363,7 +363,7 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid grid-cols-2 md:grid-cols-4 gap-6">
           {STATS.map((s, i) => (
             <motion.div key={i} variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} custom={i} className="text-center">
-              <p className="text-3xl sm:text-4xl font-bold font-mono text-blue-600 tabular-nums">{s.value}</p>
+              <p className="text-3xl sm:text-4xl font-bold font-mono text-[#0030cf] tabular-nums">{s.value}</p>
               <p className="text-sm text-slate-500 mt-1">{s.label}</p>
             </motion.div>
           ))}
@@ -373,7 +373,7 @@ export default function Landing() {
       {/* Features */}
       <section id="features" className="max-w-6xl mx-auto px-4 sm:px-6 py-20 sm:py-28">
         <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-blue-600">Why XamanProtocol</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#0030cf]">Why XamanProtocol</p>
           <h2 className="text-3xl sm:text-4xl font-bold mt-3 text-slate-900">Everything a VIP wallet should be.</h2>
           <p className="text-slate-500 mt-4 leading-relaxed">Built for members who want the sovereignty of self-custody with the simplicity of a modern app — and yield that works around the clock.</p>
         </div>
@@ -381,7 +381,7 @@ export default function Landing() {
           {FEATURES.map((f, i) => (
             <motion.div key={i} variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} custom={i % 3} className="bg-white border border-slate-200 rounded-2xl p-6 glow-card shadow-sm" data-testid={`feature-card-${i}`}>
               <div className="w-11 h-11 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center mb-4">
-                <f.icon size={20} className="text-blue-600" />
+                <f.icon size={20} className="text-[#0030cf]" />
               </div>
               <h3 className="text-lg font-semibold text-slate-900">{f.title}</h3>
               <p className="text-sm text-slate-500 mt-2 leading-relaxed">{f.text}</p>
@@ -425,7 +425,7 @@ export default function Landing() {
       {/* Yield calculator */}
       <section id="calculator" className="max-w-6xl mx-auto px-4 sm:px-6 pb-20 sm:pb-28">
         <div className="max-w-2xl mb-10">
-          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-blue-600">Yield calculator</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#0030cf]">Yield calculator</p>
           <h2 className="text-3xl sm:text-4xl font-bold mt-3 text-slate-900">See what your XRP could earn.</h2>
           <p className="text-slate-500 mt-4 leading-relaxed">Set an amount, pick a vault, and watch the projected yield update live — figures are illustrative, based on each vault's fixed APY.</p>
         </div>
@@ -436,7 +436,7 @@ export default function Landing() {
       <section id="tiers" className="border-y border-slate-200 bg-[#F7F9FC] py-20 sm:py-28">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="max-w-2xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-blue-600">VIP tiers</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#0030cf]">VIP tiers</p>
             <h2 className="text-3xl sm:text-4xl font-bold mt-3 text-slate-900">Rewards that scale with you.</h2>
             <p className="text-slate-500 mt-4 leading-relaxed">Your tier unlocks automatically as your total staked XRP grows — and each tier opens a higher-yield vault.</p>
           </div>
@@ -459,14 +459,14 @@ export default function Landing() {
       {/* How it works */}
       <section id="how" className="max-w-6xl mx-auto px-4 sm:px-6 pb-20 sm:pb-28">
         <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-blue-600">How it works</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#0030cf]">How it works</p>
           <h2 className="text-3xl sm:text-4xl font-bold mt-3 text-slate-900">Four steps to live yield.</h2>
         </div>
         <div className="grid md:grid-cols-4 gap-6 mt-12">
           {STEPS.map((s, i) => (
             <motion.div key={i} variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} custom={i} className="relative">
               <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center mb-4">
-                <s.icon size={22} className="text-blue-600" />
+                <s.icon size={22} className="text-[#0030cf]" />
               </div>
               <span className="absolute top-0 right-0 font-mono text-4xl font-bold text-slate-100">0{i + 1}</span>
               <h3 className="font-semibold text-lg text-slate-900">{s.title}</h3>
@@ -480,20 +480,20 @@ export default function Landing() {
       <section id="security" className="border-y border-slate-200 bg-[#F7F9FC] py-20 sm:py-28">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 grid lg:grid-cols-2 gap-12 items-center">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-blue-600">Security first</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#0030cf]">Security first</p>
             <h2 className="text-3xl sm:text-4xl font-bold mt-3 text-slate-900">Your keys. Your crypto. Uncompromised.</h2>
             <p className="text-slate-500 mt-4 leading-relaxed">XamanProtocol is built on a simple principle: only you should be able to access your wallet. There's no password to steal and no account to hijack — just a phrase that lives with you.</p>
             <div className="flex flex-wrap items-center gap-3 mt-6">
               <a href="/whitepaper.pdf" target="_blank" rel="noreferrer" data-testid="whitepaper-pdf-button" className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold px-5 py-3 rounded-xl glow-blue transition-all active:scale-95">
                 <FileText size={17} /> Read the Whitepaper
               </a>
-              <Link to="/whitepaper" className="inline-flex items-center gap-2 text-blue-600 font-semibold hover:underline">Overview <ArrowRight size={16} /></Link>
+              <Link to="/whitepaper" className="inline-flex items-center gap-2 text-[#0030cf] font-semibold hover:underline">Overview <ArrowRight size={16} /></Link>
             </div>
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
             {SECURITY.map((s, i) => (
               <motion.div key={i} variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} custom={i} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                <s.icon size={20} className="text-blue-600 mb-3" />
+                <s.icon size={20} className="text-[#0030cf] mb-3" />
                 <h3 className="font-semibold text-slate-900 text-sm">{s.title}</h3>
                 <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{s.text}</p>
               </motion.div>
@@ -505,7 +505,7 @@ export default function Landing() {
       {/* Education — how yield works */}
       <section id="learn" className="max-w-6xl mx-auto px-4 sm:px-6 py-20 sm:py-28">
         <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-blue-600">Learn</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#0030cf]">Learn</p>
           <h2 className="text-3xl sm:text-4xl font-bold mt-3 text-slate-900">How staking yield works.</h2>
           <p className="text-slate-500 mt-4 leading-relaxed">New to staking? Here's the short version — no jargon, just how your XRP goes to work.</p>
         </div>
@@ -513,7 +513,7 @@ export default function Landing() {
           {EDU.map((e, i) => (
             <motion.div key={e.title} variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} custom={i} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm glow-card">
               <div className="w-11 h-11 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center mb-4">
-                <e.icon size={20} className="text-blue-600" />
+                <e.icon size={20} className="text-[#0030cf]" />
               </div>
               <h3 className="font-semibold text-slate-900">{e.title}</h3>
               <p className="text-sm text-slate-500 mt-2 leading-relaxed">{e.text}</p>
@@ -525,7 +525,7 @@ export default function Landing() {
       {/* Self custody CTA */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-20 sm:py-28 text-center">
         <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
-          <Eye className="mx-auto text-blue-600 mb-5" size={34} />
+          <Eye className="mx-auto text-[#0030cf] mb-5" size={34} />
           <h2 className="text-3xl sm:text-5xl font-bold max-w-3xl mx-auto leading-tight text-slate-900">Self-custody in your pocket. Only you hold the keys.</h2>
           <p className="text-slate-500 mt-5 max-w-xl mx-auto">Install XamanProtocol to your home screen and access your VIP vaults like a native app — anywhere, anytime.</p>
           <Link to="/create" data-testid="cta-create" className="inline-flex items-center gap-2 mt-8 bg-blue-600 hover:bg-blue-500 text-white font-semibold px-8 py-4 rounded-2xl glow-blue transition-all active:scale-95">

@@ -7,7 +7,7 @@ import { ArrowDownToLine, ArrowUpFromLine, Layers, Sparkles, Settings2, Receipt 
 const TYPE_META = {
   deposit: { label: "Deposit", icon: ArrowDownToLine, color: "#059669", sign: "+" },
   withdrawal: { label: "Withdrawal", icon: ArrowUpFromLine, color: "#D97706", sign: "-" },
-  stake: { label: "Stake", icon: Layers, color: "#2563EB", sign: "-" },
+  stake: { label: "Stake", icon: Layers, color: "#0030cf", sign: "-" },
   reinvest: { label: "Restake", icon: Sparkles, color: "#7C3AED", sign: "" },
   profit: { label: "Profit bonus", icon: Sparkles, color: "#059669", sign: "+" },
   adjustment: { label: "Adjustment", icon: Settings2, color: "#64748B", sign: "" },

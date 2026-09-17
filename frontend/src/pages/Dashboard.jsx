@@ -53,7 +53,7 @@ function ReinvestDialog({ open, onClose, profit, onDone }) {
             <p className="text-xs text-blue-200 mt-1">Compounds into a fresh stake — no new deposit needed.</p>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-blue-600 mb-2">Choose a vault</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#0030cf] mb-2">Choose a vault</p>
             <div className="flex flex-wrap gap-2">
               {vaults.map((v) => {
                 const ok = profit >= (v.min_amount || 0);
@@ -79,7 +79,7 @@ function ReinvestDialog({ open, onClose, profit, onDone }) {
   );
 }
 
-function StatCard({ icon: Icon, label, children, accent = "#2563EB", testid, delay = 0 }) {
+function StatCard({ icon: Icon, label, children, accent = "#0030cf", testid, delay = 0 }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 14 }}
@@ -170,7 +170,7 @@ export default function Dashboard() {
       </motion.div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard icon={Layers} label="Total Staked" accent="#2563EB" testid="stat-total-staked" delay={0.05}>
+        <StatCard icon={Layers} label="Total Staked" accent="#0030cf" testid="stat-total-staked" delay={0.05}>
           <p className="text-2xl font-bold text-slate-900 font-mono tabular-nums">{fmtXRP(s.total_staked)} <span className="text-sm text-slate-400">XRP</span></p>
         </StatCard>
         <StatCard icon={Sparkles} label="Total Profit" accent="#059669" testid="stat-total-profit" delay={0.1}>
@@ -178,7 +178,7 @@ export default function Dashboard() {
             <LiveProfit stakes={activeStakes} bonus={s.bonus_profit} offsetRef={serverOffset} /> <span className="text-sm text-slate-400">XRP</span>
           </p>
           {s.profit >= 10 && (
-            <button onClick={() => setReinvestOpen(true)} data-testid="reinvest-button" className="mt-2.5 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg px-3 py-1.5 transition-colors">
+            <button onClick={() => setReinvestOpen(true)} data-testid="reinvest-button" className="mt-2.5 inline-flex items-center gap-1.5 text-xs font-semibold text-[#0030cf] bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg px-3 py-1.5 transition-colors">
               <Repeat size={13} /> Restake profit
             </button>
           )}
@@ -203,7 +203,7 @@ export default function Dashboard() {
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold text-slate-900">Active Stakes</h2>
-          <button onClick={() => navigate("/app/vaults")} data-testid="view-vaults-link" className="text-sm text-blue-600 hover:underline">Explore vaults →</button>
+          <button onClick={() => navigate("/app/vaults")} data-testid="view-vaults-link" className="text-sm text-[#0030cf] hover:underline">Explore vaults →</button>
         </div>
         {activeStakes.length === 0 ? (
           <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-8 text-center" data-testid="no-stakes">
@@ -230,7 +230,7 @@ export default function Dashboard() {
                     {st.status === "matured" ? (
                       <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">Matured</span>
                     ) : (
-                      <span className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-200"><Clock size={11} /> Active</span>
+                      <span className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-[#0030cf] border border-blue-200"><Clock size={11} /> Active</span>
                     )}
                   </div>
                   <div className="grid grid-cols-2 gap-3 mt-4">
@@ -246,7 +246,7 @@ export default function Dashboard() {
                   {st.duration_days > 0 && st.status !== "matured" && (
                     <div className="flex items-center justify-between mt-3 px-3 py-2 rounded-xl bg-blue-50 border border-blue-100">
                       <span className="text-xs text-slate-500 flex items-center gap-1.5"><Clock size={12} /> Unlocks in</span>
-                      <Countdown target={st.matures_at} offsetRef={serverOffset} className="font-mono text-sm font-semibold text-blue-600 tabular-nums" testid={`countdown-${st.id}`} />
+                      <Countdown target={st.matures_at} offsetRef={serverOffset} className="font-mono text-sm font-semibold text-[#0030cf] tabular-nums" testid={`countdown-${st.id}`} />
                     </div>
                   )}
                 </div>
