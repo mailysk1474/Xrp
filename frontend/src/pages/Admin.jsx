@@ -24,7 +24,7 @@ export default function Admin() {
 
   return (
     <div className="min-h-screen bg-[#F7F9FC] bg-radial-blue">
-      <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/85 border-b border-slate-200">
+      <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/85 border-b border-slate-200 safe-top safe-x">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Logo size={32} />

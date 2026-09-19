@@ -5,7 +5,7 @@ import { ArrowLeft } from "lucide-react";
 export function AuthLayout({ children, back = "/", maxWidth = "max-w-md" }) {
   return (
     <div className="min-h-screen bg-white bg-radial-blue flex flex-col">
-      <header className="px-4 sm:px-6 h-16 flex items-center justify-between max-w-6xl mx-auto w-full">
+      <header className="px-4 sm:px-6 h-16 flex items-center justify-between max-w-6xl mx-auto w-full safe-top safe-x">
         <Logo size={32} />
         <Link
           to={back}

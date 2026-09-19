@@ -311,7 +311,7 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-white text-slate-900 overflow-x-hidden">
       {/* Nav */}
-      <header className={`fixed top-0 inset-x-0 z-50 transition-all ${scrolled ? "backdrop-blur-xl bg-white/85 border-b border-slate-200" : ""}`}>
+      <header className={`fixed top-0 inset-x-0 z-50 transition-all safe-top safe-x ${scrolled ? "backdrop-blur-xl bg-white/85 border-b border-slate-200" : ""}`}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <Logo size={32} />
           <nav className="hidden md:flex items-center gap-7 text-sm text-slate-600">

@@ -24,7 +24,7 @@ const SECTIONS = [
 export default function Whitepaper() {
   return (
     <div className="min-h-screen bg-white text-slate-900 bg-radial-blue">
-      <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/85 border-b border-slate-200">
+      <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/85 border-b border-slate-200 safe-top safe-x">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <Logo size={32} />
           <Link to="/" data-testid="whitepaper-back" className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 transition-colors">

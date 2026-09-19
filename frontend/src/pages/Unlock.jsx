@@ -49,7 +49,7 @@ export default function Unlock() {
 
   return (
     <div className="min-h-screen bg-white bg-radial-blue flex flex-col">
-      <header className="px-4 sm:px-6 h-16 flex items-center max-w-6xl mx-auto w-full">
+      <header className="px-4 sm:px-6 h-16 flex items-center max-w-6xl mx-auto w-full safe-top safe-x">
         <Logo size={32} />
       </header>
       <div className="flex-1 flex items-center justify-center px-4">

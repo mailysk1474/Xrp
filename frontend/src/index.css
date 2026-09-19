@@ -119,3 +119,17 @@ body {
 .safe-bottom {
     padding-bottom: calc(env(safe-area-inset-bottom) + 1rem);
 }
+/* Home-screen (standalone) safe areas — keep headers clear of the notch/status bar */
+.safe-top {
+    padding-top: env(safe-area-inset-top);
+}
+.safe-x {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+}
+/* Fill the status-bar area with the app background so it doesn't look transparent */
+@supports (padding: env(safe-area-inset-top)) {
+    body {
+        background-color: #ffffff;
+    }
+}
