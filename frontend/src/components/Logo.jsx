@@ -8,7 +8,7 @@ export function Logo({ size = 34, withText = true, className = "" }) {
         alt="XamanProtocol"
         width={size}
         height={size}
-        className="rounded-[10px] ring-1 ring-slate-200 group-hover:ring-blue-400/50 transition-all"
+        className="object-contain group-hover:opacity-80 transition-opacity"
         style={{ width: size, height: size }}
       />
       {withText && (
