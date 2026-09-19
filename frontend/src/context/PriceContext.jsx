@@ -3,7 +3,7 @@ import { api } from "@/lib/api";
 
 const PriceContext = createContext(null);
 
-const REFRESH_MS = 60000;
+const REFRESH_MS = 120000; // 2 min — backend caches for 5 min, so this only re-reads the cache
 
 export function PriceProvider({ children }) {
   const [rate, setRate] = useState(null); // XRP -> USD

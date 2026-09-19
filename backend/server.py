@@ -458,12 +458,26 @@ async def get_vaults():
 # XRP -> USD price (public, cached). Coinbase primary, Kraken fallback.
 # ---------------------------------------------------------------------------
 _price_cache: Dict[str, Any] = {"usd": None, "ts": 0.0, "source": None}
-_PRICE_TTL = 60  # seconds
+_PRICE_TTL = 300  # seconds (5 min) — keeps external calls well under free rate limits
 
 
 async def _fetch_xrp_usd() -> Optional[Dict[str, Any]]:
     async with httpx.AsyncClient(timeout=8.0) as http:
-        # Coinbase
+        # CoinGecko (primary)
+        try:
+            r = await http.get(
+                "https://api.coingecko.com/api/v3/simple/price",
+                params={"ids": "ripple", "vs_currencies": "usd"},
+            )
+            if r.status_code == 200:
+                amt = float(r.json().get("ripple", {}).get("usd", 0))
+                if amt > 0:
+                    return {"usd": amt, "source": "coingecko"}
+            else:
+                logger.warning("coingecko price status %s", r.status_code)
+        except Exception as e:
+            logger.warning("coingecko price failed: %s", e)
+        # Coinbase (fallback)
         try:
             r = await http.get("https://api.coinbase.com/v2/prices/XRP-USD/spot")
             if r.status_code == 200:
@@ -472,7 +486,7 @@ async def _fetch_xrp_usd() -> Optional[Dict[str, Any]]:
                     return {"usd": amt, "source": "coinbase"}
         except Exception as e:
             logger.warning("coinbase price failed: %s", e)
-        # Kraken fallback
+        # Kraken (fallback)
         try:
             r = await http.get("https://api.kraken.com/0/public/Ticker?pair=XRPUSD")
             if r.status_code == 200:
