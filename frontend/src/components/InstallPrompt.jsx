@@ -37,8 +37,16 @@ export function InstallPrompt() {
     };
     window.addEventListener("beforeinstallprompt", handler);
 
+    // Once the app is actually installed, hide the banner immediately.
+    const installed = () => {
+      sessionStorage.setItem(DISMISS_KEY, "1");
+      setMode(null);
+      setDeferred(null);
+    };
+    window.addEventListener("appinstalled", installed);
+
     // If no one-tap prompt is offered shortly, fall back to manual instructions
-    // so an install path is shown on EVERY device/browser.
+    // ONLY on platforms that cannot auto-install (iOS Safari, unsupported browsers).
     const timer = setTimeout(() => {
       setMode((m) => {
         if (m) return m; // already got the one-tap prompt
@@ -50,6 +58,7 @@ export function InstallPrompt() {
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handler);
+      window.removeEventListener("appinstalled", installed);
       clearTimeout(timer);
     };
   }, []);
@@ -99,11 +108,13 @@ export function InstallPrompt() {
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-slate-900">Add to Home Screen</p>
         {mode === "chrome" ? (
-          <p className="text-xs text-slate-500">Install XamanProtocol for a native app feel.</p>
+          <p className="text-xs text-slate-500">One tap to install — it&apos;ll appear on your home screen.</p>
         ) : (
-          instructions[mode]
+          <>
+            {instructions[mode]}
+            <InstallGuide />
+          </>
         )}
-        <InstallGuide />
       </div>
       {mode === "chrome" && (
         <button
