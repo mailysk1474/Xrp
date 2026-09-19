@@ -101,3 +101,68 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: |
+  Increase the vault minimum-stake ladder (Flex 50k / Silver 150k / Gold 350k / Platinum 750k / Diamond 2M XRP)
+  and display real USD values next to XRP amounts across the app using a live XRP->USD price.
+
+backend:
+  - task: "Vault minimum-stake ladder increase"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Updated DEFAULT_VAULTS min_amount + TIER_THRESHOLDS + next_tier_progress thresholds to new ladder (50k/150k/350k/750k/2M). Ran scripts/migrate_vault_mins.py against Atlas DB to update existing vault records. GET /api/vaults should return new minimums; POST /api/stakes should reject below-min amounts."
+        -working: true
+        -agent: "testing"
+        -comment: "✅ VERIFIED: GET /api/vaults returns all 5 vaults with correct min_amount values (xrp_flex=50000, vip_silver=150000, vip_gold=350000, vip_platinum=750000, vip_diamond=2000000). POST /api/stakes correctly validates min-amount and returns 400 with 'Minimum for this vault is 150000 XRP.' when attempting to stake 100 XRP in vip_silver (min 150000). Min-amount validation occurs BEFORE balance check as expected."
+  - task: "XRP->USD price endpoint"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "New public GET /api/price/xrp endpoint. Coinbase primary, Kraken fallback, 60s in-memory cache. Returns {usd, source, cached, updated_at}. First call fresh, subsequent cached. Verified via curl (usd~1.43, coinbase)."
+        -working: true
+        -agent: "testing"
+        -comment: "✅ VERIFIED: GET /api/price/xrp returns HTTP 200 with correct JSON structure {usd: 1.4299, source: 'coinbase', cached: true, updated_at: timestamp}. USD value is positive and in expected range. Source is valid (coinbase/kraken). Caching mechanism works correctly - subsequent calls within 60s return cached=true with same USD value. All requirements met."
+
+frontend:
+  - task: "USD values shown next to XRP across app"
+    implemented: true
+    working: "NA"
+    file: "frontend/src/context/PriceContext.jsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Added PriceProvider (polls /api/price/xrp every 60s) + fmtUSD/xrpToUsdLabel helpers. USD secondary lines added to VaultsPage, Dashboard, Deposit, Withdraw, History, and a live XRP price badge in AppShell header. Not yet UI-tested."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.1"
+  test_sequence: 1
+  run_ui: false
+
+test_plan:
+  current_focus: []
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+    -agent: "main"
+    -message: "Please test backend only: (1) GET /api/price/xrp returns a positive usd number with source coinbase/kraken and caches on the 2nd call; (2) GET /api/vaults returns the new minimums (xrp_flex 50000, vip_silver 150000, vip_gold 350000, vip_platinum 750000, vip_diamond 2000000); (3) POST /api/stakes rejects an amount below the vault min with 400. Admin creds are in /app/memory/test_credentials.md."
+    -agent: "testing"
+    -message: "✅ Backend testing complete. All 3 tests PASSED: (1) GET /api/price/xrp returns positive USD value (1.4299), correct source (coinbase), and caching works correctly. (2) GET /api/vaults returns all 5 vaults with exact min_amount values matching new ladder. (3) POST /api/stakes correctly validates min-amount and returns 400 'Minimum for this vault is 150000 XRP.' before balance check. Both backend tasks marked as working=true. No issues found."

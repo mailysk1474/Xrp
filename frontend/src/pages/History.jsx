@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { api } from "@/lib/api";
-import { fmtXRP, fmtDate } from "@/lib/format";
+import { usePrice } from "@/context/PriceContext";
+import { fmtXRP, fmtDate, xrpToUsdLabel } from "@/lib/format";
 import { ArrowDownToLine, ArrowUpFromLine, Layers, Sparkles, Settings2, Receipt } from "lucide-react";
 
 const TYPE_META = {
@@ -21,6 +22,7 @@ const STATUS_META = {
 
 export default function History() {
   const [txns, setTxns] = useState(null);
+  const { rate } = usePrice();
 
   const load = useCallback(() => {
     api.get("/transactions").then(({ data }) => setTxns(data.transactions)).catch(() => setTxns([]));
@@ -62,6 +64,7 @@ export default function History() {
                   <p className="font-mono font-semibold text-sm" style={{ color: meta.sign === "+" ? "#059669" : meta.sign === "-" ? "#0F172A" : "#64748B" }}>
                     {meta.sign}{fmtXRP(t.amount)} <span className="text-xs text-slate-400">XRP</span>
                   </p>
+                  {rate ? <p className="text-[11px] text-slate-400 font-mono">{xrpToUsdLabel(t.amount, rate, 2)}</p> : null}
                   <span className={`inline-block mt-1 text-[10px] font-medium px-2 py-0.5 rounded-full border capitalize ${STATUS_META[t.status] || STATUS_META.completed}`}>{t.status}</span>
                 </div>
               </motion.div>

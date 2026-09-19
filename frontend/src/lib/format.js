@@ -6,6 +6,23 @@ export function fmtXRP(n, digits = 2) {
   });
 }
 
+// Format a USD amount. Pass digits=0 for large round figures.
+export function fmtUSD(n, digits = 2) {
+  if (n == null || isNaN(n)) return "—";
+  return Number(n).toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}
+
+// Convenience: format an XRP amount's USD equivalent given a rate. Returns null if no rate.
+export function xrpToUsdLabel(xrp, rate, digits = 2) {
+  if (rate == null || xrp == null || isNaN(xrp)) return null;
+  return "≈ " + fmtUSD(Number(xrp) * rate, digits);
+}
+
 export function fmtDate(iso) {
   if (!iso) return "—";
   try {

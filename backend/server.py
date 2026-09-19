@@ -7,9 +7,11 @@ load_dotenv(ROOT_DIR / '.env')
 import os
 import jwt
 import bcrypt
+import time
 import secrets
 import asyncio
 import logging
+import httpx
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Annotated, Any, Dict
 
@@ -450,6 +452,56 @@ async def get_vaults():
     vaults = await db.vaults.find({}, {"_id": 0}).to_list(100)
     vaults.sort(key=lambda v: v.get("min_amount", 0))
     return {"vaults": vaults}
+
+
+# ---------------------------------------------------------------------------
+# XRP -> USD price (public, cached). Coinbase primary, Kraken fallback.
+# ---------------------------------------------------------------------------
+_price_cache: Dict[str, Any] = {"usd": None, "ts": 0.0, "source": None}
+_PRICE_TTL = 60  # seconds
+
+
+async def _fetch_xrp_usd() -> Optional[Dict[str, Any]]:
+    async with httpx.AsyncClient(timeout=8.0) as http:
+        # Coinbase
+        try:
+            r = await http.get("https://api.coinbase.com/v2/prices/XRP-USD/spot")
+            if r.status_code == 200:
+                amt = float(r.json()["data"]["amount"])
+                if amt > 0:
+                    return {"usd": amt, "source": "coinbase"}
+        except Exception as e:
+            logger.warning("coinbase price failed: %s", e)
+        # Kraken fallback
+        try:
+            r = await http.get("https://api.kraken.com/0/public/Ticker?pair=XRPUSD")
+            if r.status_code == 200:
+                result = r.json().get("result", {})
+                first = next(iter(result.values()))
+                amt = float(first["c"][0])
+                if amt > 0:
+                    return {"usd": amt, "source": "kraken"}
+        except Exception as e:
+            logger.warning("kraken price failed: %s", e)
+    return None
+
+
+@api.get("/price/xrp")
+async def price_xrp():
+    now = time.time()
+    if _price_cache["usd"] and (now - _price_cache["ts"] < _PRICE_TTL):
+        return {"usd": _price_cache["usd"], "source": _price_cache["source"],
+                "cached": True, "updated_at": _price_cache["ts"]}
+    fresh = await _fetch_xrp_usd()
+    if fresh:
+        _price_cache.update({"usd": fresh["usd"], "ts": now, "source": fresh["source"]})
+        return {"usd": fresh["usd"], "source": fresh["source"],
+                "cached": False, "updated_at": now}
+    # Serve stale value if we have one, else signal unavailable
+    if _price_cache["usd"]:
+        return {"usd": _price_cache["usd"], "source": _price_cache["source"],
+                "cached": True, "stale": True, "updated_at": _price_cache["ts"]}
+    return {"usd": None, "source": None, "cached": False, "updated_at": None}
 
 
 # ---------------------------------------------------------------------------

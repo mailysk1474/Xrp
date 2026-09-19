@@ -1,5 +1,7 @@
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import { usePrice } from "@/context/PriceContext";
+import { fmtUSD } from "@/lib/format";
 import { Logo } from "@/components/Logo";
 import { LayoutDashboard, Layers, ArrowDownToLine, ArrowUpFromLine, Receipt, Lock, ShieldCheck } from "lucide-react";
 
@@ -13,6 +15,7 @@ const navItems = [
 
 export function AppShell() {
   const { user, lock } = useAuth();
+  const { rate } = usePrice();
   const navigate = useNavigate();
 
   const onLock = () => {
@@ -27,6 +30,11 @@ export function AppShell() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <Logo size={32} />
           <div className="flex items-center gap-2">
+            {rate ? (
+              <span data-testid="xrp-price-badge" className="hidden sm:inline-flex items-center gap-1.5 text-xs font-mono font-medium px-3 py-2 rounded-lg bg-slate-50 text-slate-600 border border-slate-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> XRP {fmtUSD(rate, 4)}
+              </span>
+            ) : null}
             {user?.role === "admin" && (
               <NavLink
                 to="/admin"

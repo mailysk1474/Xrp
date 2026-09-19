@@ -1,6 +1,7 @@
 import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { PriceProvider } from "@/context/PriceContext";
 import { Toaster } from "@/components/ui/sonner";
 import { InstallPrompt } from "@/components/InstallPrompt";
 
@@ -77,9 +78,11 @@ function App() {
     <div className="App">
       <AuthProvider>
         <BrowserRouter>
-          <AppRoutes />
-          <InstallPrompt />
-          <Toaster position="top-center" theme="light" richColors />
+          <PriceProvider>
+            <AppRoutes />
+            <InstallPrompt />
+            <Toaster position="top-center" theme="light" richColors />
+          </PriceProvider>
         </BrowserRouter>
       </AuthProvider>
     </div>

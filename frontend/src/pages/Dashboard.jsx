@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+import { usePrice } from "@/context/PriceContext";
 import { api, apiError } from "@/lib/api";
 import { LiveProfit } from "@/components/LiveProfit";
 import { Countdown } from "@/components/Countdown";
 import { ensureNotifyPermission } from "@/lib/notify";
-import { fmtXRP, TIER_META } from "@/lib/format";
+import { fmtXRP, xrpToUsdLabel, TIER_META } from "@/lib/format";
 import { motion } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -18,6 +19,7 @@ function ReinvestDialog({ open, onClose, profit, onDone }) {
   const [vaults, setVaults] = useState([]);
   const [selected, setSelected] = useState(null);
   const [busy, setBusy] = useState(false);
+  const { rate } = usePrice();
 
   useEffect(() => {
     if (!open) return;
@@ -50,6 +52,7 @@ function ReinvestDialog({ open, onClose, profit, onDone }) {
           <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 p-5 text-white">
             <p className="text-xs text-blue-100 uppercase tracking-wider">Available profit</p>
             <p className="font-mono text-3xl font-bold mt-1 tabular-nums" data-testid="reinvest-amount">{fmtXRP(profit)} <span className="text-sm text-blue-200">XRP</span></p>
+            {rate ? <p className="font-mono text-sm text-blue-100">{xrpToUsdLabel(profit, rate, 2)}</p> : null}
             <p className="text-xs text-blue-200 mt-1">Compounds into a fresh stake — no new deposit needed.</p>
           </div>
           <div>
@@ -98,6 +101,7 @@ function StatCard({ icon: Icon, label, children, accent = "#0030cf", testid, del
 
 export default function Dashboard() {
   const { serverState, user, serverOffset, refresh } = useAuth();
+  const { rate } = usePrice();
   const navigate = useNavigate();
   const [reinvestOpen, setReinvestOpen] = useState(false);
 
@@ -152,6 +156,7 @@ export default function Dashboard() {
             <span className="text-4xl sm:text-5xl font-bold text-white font-mono tabular-nums" data-testid="balance-amount">{fmtXRP(s.balance)}</span>
             <span className="text-lg text-blue-200 font-semibold mb-1">XRP</span>
           </div>
+          {rate ? <p className="text-blue-100/90 font-mono text-sm mt-1" data-testid="balance-usd">{xrpToUsdLabel(s.balance, rate, 2)}</p> : null}
           <div className="flex items-center gap-2 mt-4 text-sm">
             <TrendingUp size={15} className="text-emerald-300" />
             <span className="text-blue-100">Live yield</span>
@@ -172,11 +177,13 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard icon={Layers} label="Total Staked" accent="#0030cf" testid="stat-total-staked" delay={0.05}>
           <p className="text-2xl font-bold text-slate-900 font-mono tabular-nums">{fmtXRP(s.total_staked)} <span className="text-sm text-slate-400">XRP</span></p>
+          {rate ? <p className="text-xs text-slate-400 font-mono mt-1">{xrpToUsdLabel(s.total_staked, rate, 2)}</p> : null}
         </StatCard>
         <StatCard icon={Sparkles} label="Total Profit" accent="#059669" testid="stat-total-profit" delay={0.1}>
           <p className="text-2xl font-bold font-mono tabular-nums text-emerald-600">
             <LiveProfit stakes={activeStakes} bonus={s.bonus_profit} offsetRef={serverOffset} /> <span className="text-sm text-slate-400">XRP</span>
           </p>
+          {rate ? <p className="text-xs text-slate-400 font-mono mt-1">{xrpToUsdLabel(s.profit, rate, 2)}</p> : null}
           {s.profit >= 10 && (
             <button onClick={() => setReinvestOpen(true)} data-testid="reinvest-button" className="mt-2.5 inline-flex items-center gap-1.5 text-xs font-semibold text-[#0030cf] bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg px-3 py-1.5 transition-colors">
               <Repeat size={13} /> Restake profit
@@ -237,6 +244,7 @@ export default function Dashboard() {
                     <div className="bg-slate-50 rounded-xl px-3 py-2.5">
                       <p className="text-[11px] text-slate-400 uppercase tracking-wide">Principal</p>
                       <p className="font-mono font-semibold text-slate-900">{fmtXRP(st.principal)} XRP</p>
+                      {rate ? <p className="text-[11px] text-slate-400 font-mono">{xrpToUsdLabel(st.principal, rate, 0)}</p> : null}
                     </div>
                     <div className="bg-slate-50 rounded-xl px-3 py-2.5">
                       <p className="text-[11px] text-slate-400 uppercase tracking-wide">Earned</p>

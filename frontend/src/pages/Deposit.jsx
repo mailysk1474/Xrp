@@ -3,7 +3,9 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "@/context/AuthContext";
+import { usePrice } from "@/context/PriceContext";
 import { api, apiError } from "@/lib/api";
+import { xrpToUsdLabel } from "@/lib/format";
 import { Copy, Check, Info, Loader2, ArrowDownToLine } from "lucide-react";
 
 function CopyRow({ label, value, testid }) {
@@ -29,6 +31,7 @@ function CopyRow({ label, value, testid }) {
 
 export default function Deposit() {
   const { serverState, refresh } = useAuth();
+  const { rate } = usePrice();
   const [info, setInfo] = useState(null);
   const [amount, setAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -94,6 +97,7 @@ export default function Deposit() {
         <div>
           <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf]">Amount sent (XRP)</label>
           <input data-testid="deposit-amount-input" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1.5 w-full bg-slate-50 border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 rounded-xl px-4 py-3 text-slate-900 outline-none font-mono transition-all" placeholder="0.00" />
+          {rate && amount && parseFloat(amount) > 0 ? <p className="text-xs text-slate-500 mt-1.5 font-mono">{xrpToUsdLabel(parseFloat(amount), rate, 2)}</p> : null}
         </div>
         <button onClick={submit} disabled={submitting || locked} data-testid="submit-deposit-button" className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold py-3 rounded-xl glow-blue transition-all">
           {submitting ? <Loader2 className="animate-spin" size={18} /> : "Submit deposit for confirmation"}

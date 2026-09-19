@@ -2,12 +2,14 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
+import { usePrice } from "@/context/PriceContext";
 import { api, apiError } from "@/lib/api";
-import { fmtXRP } from "@/lib/format";
+import { fmtXRP, xrpToUsdLabel } from "@/lib/format";
 import { Loader2, ArrowUpFromLine, AlertTriangle } from "lucide-react";
 
 export default function Withdraw() {
   const { serverState, refresh } = useAuth();
+  const { rate } = usePrice();
   const [amount, setAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const balance = serverState?.balance ?? 0;
@@ -49,7 +51,7 @@ export default function Withdraw() {
       <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm">
         <div className="flex items-center justify-between bg-slate-50 rounded-xl px-4 py-3">
           <span className="text-sm text-slate-500">Available balance</span>
-          <span className="font-mono font-semibold text-slate-900" data-testid="withdraw-available">{fmtXRP(balance)} XRP</span>
+          <span className="font-mono font-semibold text-slate-900" data-testid="withdraw-available">{fmtXRP(balance)} XRP{rate ? <span className="block text-right text-xs text-slate-400 font-normal">{xrpToUsdLabel(balance, rate, 2)}</span> : null}</span>
         </div>
         <div>
           <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf]">Amount (XRP)</label>
@@ -57,6 +59,7 @@ export default function Withdraw() {
             <input data-testid="withdraw-amount-input" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={blocked} className="w-full bg-slate-50 border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 rounded-xl px-4 py-3 pr-16 text-slate-900 outline-none font-mono disabled:opacity-50 transition-all" placeholder="0.00" />
             <button onClick={() => setAmount(String(balance))} disabled={blocked} data-testid="withdraw-max-button" className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#0030cf] bg-blue-50 px-2.5 py-1 rounded-lg disabled:opacity-40">MAX</button>
           </div>
+          {rate && amount && parseFloat(amount) > 0 ? <p className="text-xs text-slate-500 mt-1.5 font-mono">{xrpToUsdLabel(parseFloat(amount), rate, 2)}</p> : null}
         </div>
         <button onClick={submit} disabled={submitting || blocked} data-testid="submit-withdraw-button" className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-semibold py-3 rounded-xl glow-blue transition-all">
           {submitting ? <Loader2 className="animate-spin" size={18} /> : <><ArrowUpFromLine size={17} /> Request withdrawal</>}

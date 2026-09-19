@@ -2,13 +2,15 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
+import { usePrice } from "@/context/PriceContext";
 import { api, apiError } from "@/lib/api";
-import { fmtXRP, TIER_META } from "@/lib/format";
+import { fmtXRP, xrpToUsdLabel, TIER_META } from "@/lib/format";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Layers, Lock, Zap, TrendingUp, Loader2, BarChart3 } from "lucide-react";
 
 export default function VaultsPage() {
   const { serverState, refresh } = useAuth();
+  const { rate } = usePrice();
   const [vaults, setVaults] = useState([]);
   const [selected, setSelected] = useState(null);
   const [amount, setAmount] = useState("");
@@ -52,7 +54,7 @@ export default function VaultsPage() {
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Vaults</h1>
-          <p className="text-sm text-slate-500 mt-1">Available balance: <span className="text-slate-900 font-mono font-semibold">{fmtXRP(balance)} XRP</span></p>
+          <p className="text-sm text-slate-500 mt-1">Available balance: <span className="text-slate-900 font-mono font-semibold">{fmtXRP(balance)} XRP</span>{rate && <span className="text-slate-400 font-mono"> · {xrpToUsdLabel(balance, rate, 2)}</span>}</p>
         </div>
         <button onClick={() => setShowCompare((v) => !v)} data-testid="compare-toggle" className="flex items-center gap-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 font-semibold px-4 py-2.5 rounded-xl transition-colors">
           <BarChart3 size={16} /> {showCompare ? "Hide comparison" : "Compare vaults"}
@@ -67,6 +69,7 @@ export default function VaultsPage() {
               <span className="text-slate-500">Amount</span>
               <input type="number" value={compareAmount} onChange={(e) => setCompareAmount(Math.max(0, parseFloat(e.target.value) || 0))} data-testid="compare-amount" className="w-32 bg-slate-50 border border-slate-300 focus:border-blue-500 rounded-lg px-3 py-1.5 font-mono outline-none" />
               <span className="text-slate-500">XRP</span>
+              {rate ? <span className="text-slate-400 font-mono">{xrpToUsdLabel(compareAmount, rate, 0)}</span> : null}
             </div>
           </div>
           <div className="overflow-x-auto">
@@ -91,9 +94,9 @@ export default function VaultsPage() {
                       <td className="py-3 pr-4 font-semibold text-slate-900"><span className="inline-block w-2 h-2 rounded-full mr-2 align-middle" style={{ background: meta.color }} />{v.name}</td>
                       <td className="py-3 px-4 font-mono font-bold" style={{ color: meta.color }}>{(v.apy * 100).toFixed(1)}%</td>
                       <td className="py-3 px-4 text-slate-600">{v.duration_days ? `${v.duration_days} days` : "Flexible"}</td>
-                      <td className="py-3 px-4 font-mono text-slate-600">{fmtXRP(v.min_amount, 0)}</td>
-                      <td className="py-3 px-4 font-mono text-emerald-600">+{fmtXRP(termYield)}</td>
-                      <td className="py-3 pl-4 font-mono text-slate-600">+{fmtXRP(perYear)}</td>
+                      <td className="py-3 px-4 font-mono text-slate-600">{fmtXRP(v.min_amount, 0)}{rate ? <span className="block text-[11px] text-slate-400">{xrpToUsdLabel(v.min_amount, rate, 0)}</span> : null}</td>
+                      <td className="py-3 px-4 font-mono text-emerald-600">+{fmtXRP(termYield)}{rate ? <span className="block text-[11px] text-slate-400">{xrpToUsdLabel(termYield, rate, 0)}</span> : null}</td>
+                      <td className="py-3 pl-4 font-mono text-slate-600">+{fmtXRP(perYear)}{rate ? <span className="block text-[11px] text-slate-400">{xrpToUsdLabel(perYear, rate, 0)}</span> : null}</td>
                     </tr>
                   );
                 })}
@@ -127,7 +130,7 @@ export default function VaultsPage() {
                 <div className="flex items-center gap-2 text-xs text-slate-500">
                   {v.duration_days ? <><Lock size={13} /> {v.duration_days}-day lock</> : <><Zap size={13} className="text-blue-500" /> Flexible term</>}
                 </div>
-                <div className="flex items-center gap-2 text-xs text-slate-500"><TrendingUp size={13} /> Min {fmtXRP(v.min_amount, 0)} XRP</div>
+                <div className="flex items-center gap-2 text-xs text-slate-500"><TrendingUp size={13} /> Min {fmtXRP(v.min_amount, 0)} XRP{rate ? <span className="text-slate-400">· {xrpToUsdLabel(v.min_amount, rate, 0)}</span> : null}</div>
                 <button onClick={() => openStake(v)} disabled={!v.enabled} data-testid={`stake-button-${v.key}`} className="w-full mt-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-semibold py-2.5 rounded-xl transition-colors active:scale-[0.99]">Stake XRP</button>
               </div>
             </motion.div>
@@ -154,7 +157,8 @@ export default function VaultsPage() {
                   <input data-testid="stake-amount-input" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full bg-slate-50 border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 rounded-xl px-4 py-3 pr-16 text-slate-900 outline-none font-mono transition-all" placeholder={`Min ${fmtXRP(selected.min_amount, 0)}`} />
                   <button onClick={() => setAmount(String(balance))} data-testid="stake-max-button" className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#0030cf] bg-blue-50 px-2.5 py-1 rounded-lg">MAX</button>
                 </div>
-                <p className="text-xs text-slate-400 mt-1.5">Available: {fmtXRP(balance)} XRP</p>
+                {rate && amount && parseFloat(amount) > 0 ? <p className="text-xs text-slate-500 mt-1.5 font-mono">{xrpToUsdLabel(parseFloat(amount), rate, 2)}</p> : null}
+                <p className="text-xs text-slate-400 mt-1.5">Available: {fmtXRP(balance)} XRP{rate ? ` · ${xrpToUsdLabel(balance, rate, 2)}` : ""}</p>
               </div>
             </div>
           )}
