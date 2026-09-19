@@ -289,10 +289,10 @@ const CALC_VAULTS = [
 
 const TIERS_TABLE = [
   { tier: "Starter", min: "0", flagship: "XRP Flex · 19.99%", lock: "Flexible", color: "#64748B" },
-  { tier: "Silver", min: "1,000", flagship: "VIP Silver · 29.99%", lock: "30 days", color: "#64748B" },
-  { tier: "Gold", min: "5,000", flagship: "VIP Gold · 49.99%", lock: "45 days", color: "#D97706" },
-  { tier: "Platinum", min: "25,000", flagship: "VIP Platinum · 89.99%", lock: "60 days", color: "#475569" },
-  { tier: "Diamond", min: "100,000", flagship: "VIP Diamond · 156%", lock: "90 days", color: "#9333EA" },
+  { tier: "Silver", min: "50,000", flagship: "VIP Silver · 29.99%", lock: "30 days", color: "#64748B" },
+  { tier: "Gold", min: "100,000", flagship: "VIP Gold · 49.99%", lock: "45 days", color: "#D97706" },
+  { tier: "Platinum", min: "250,000", flagship: "VIP Platinum · 89.99%", lock: "60 days", color: "#475569" },
+  { tier: "Diamond", min: "500,000", flagship: "VIP Diamond · 156%", lock: "90 days", color: "#9333EA" },
 ];
 
 const EDU = [
