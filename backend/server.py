@@ -13,6 +13,8 @@ import secrets
 import asyncio
 import logging
 import httpx
+import io
+import csv
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Annotated, Any, Dict
 
@@ -348,6 +350,8 @@ def public_user(user: dict) -> dict:
         "destination_tag": user.get("destination_tag"),
         "tier_override": user.get("tier_override"),
         "auto_restake": user.get("auto_restake", {"enabled": False, "threshold": None, "vault_key": None}),
+        "notify_prefs": user.get("notify_prefs", {"matured": True, "deposit": True, "withdrawal": True, "restake": True}),
+        "has_password": bool(user.get("password_hash")),
         "created_at": user.get("created_at"),
     }
 
@@ -515,6 +519,23 @@ class RecoverReq(BaseModel):
     phrase: str
 
 
+class ChangePasswordReq(BaseModel):
+    current_password: Optional[str] = None
+    new_password: str
+
+
+class UpdateProfileReq(BaseModel):
+    first_name: str
+    last_name: str
+
+
+class NotifyPrefsReq(BaseModel):
+    matured: bool = True
+    deposit: bool = True
+    withdrawal: bool = True
+    restake: bool = True
+
+
 class StakeReq(BaseModel):
     vault_key: str
     amount: float
@@ -620,6 +641,119 @@ async def recover(body: RecoverReq):
 @api.get("/auth/me")
 async def me(user: dict = Depends(get_current_user)):
     return {"user": public_user(user)}
+
+
+# ---------------------------------------------------------------------------
+# Account / profile self-service
+# ---------------------------------------------------------------------------
+@api.post("/auth/change-password")
+async def change_password(body: ChangePasswordReq, user: dict = Depends(get_current_user)):
+    if len(body.new_password) < 8:
+        raise HTTPException(status_code=400, detail="New password must be at least 8 characters.")
+    if user.get("password_hash"):
+        if not body.current_password or not verify_password(body.current_password, user["password_hash"]):
+            raise HTTPException(status_code=400, detail="Current password is incorrect.")
+    await db.users.update_one({"_id": user["_id"]}, {"$set": {"password_hash": hash_password(body.new_password)}})
+    return {"ok": True}
+
+
+@api.post("/auth/update-profile")
+async def update_profile(body: UpdateProfileReq, user: dict = Depends(get_current_user)):
+    first = body.first_name.strip()
+    last = body.last_name.strip()
+    if not first or not last:
+        raise HTTPException(status_code=400, detail="First and last name are required.")
+    await db.users.update_one({"_id": user["_id"]}, {"$set": {"first_name": first, "last_name": last}})
+    fresh = await db.users.find_one({"_id": user["_id"]})
+    await manager.notify_admins()
+    return {"ok": True, "user": public_user(fresh)}
+
+
+@api.put("/notifications/prefs")
+async def set_notify_prefs(body: NotifyPrefsReq, user: dict = Depends(get_current_user)):
+    prefs = {"matured": body.matured, "deposit": body.deposit,
+             "withdrawal": body.withdrawal, "restake": body.restake}
+    await db.users.update_one({"_id": user["_id"]}, {"$set": {"notify_prefs": prefs}})
+    return {"ok": True, "notify_prefs": prefs}
+
+
+# ---------------------------------------------------------------------------
+# Transaction export (CSV / PDF) — auth via Authorization header
+# ---------------------------------------------------------------------------
+_TXN_LABELS = {
+    "deposit": "Deposit", "withdraw": "Withdrawal", "withdrawal": "Withdrawal",
+    "stake": "Stake", "reinvest": "Restake", "early_exit": "Early exit",
+    "profit": "Profit", "matured": "Matured", "admin_credit": "Admin credit",
+    "admin_debit": "Admin debit",
+}
+
+
+def _meta_summary(meta: dict) -> str:
+    if not meta:
+        return ""
+    parts = []
+    for k in ("vault", "kind", "fee_amount", "slippage_amount", "forfeited_profit", "profit_paid", "destination_tag"):
+        if k in meta and meta[k] not in (None, ""):
+            parts.append(f"{k}={meta[k]}")
+    return "; ".join(parts)
+
+
+@api.get("/transactions/export")
+async def export_transactions(fmt: str = "csv", user: dict = Depends(get_current_user)):
+    txns = await db.transactions.find({"user_id": str(user["_id"])}).sort("created_at", -1).to_list(2000)
+    rows = []
+    for t in txns:
+        rows.append([
+            t.get("created_at", ""),
+            _TXN_LABELS.get(t.get("type", ""), (t.get("type", "") or "").title()),
+            f"{float(t.get('amount', 0) or 0):.6f}",
+            (t.get("status", "") or "").title(),
+            _meta_summary(t.get("meta", {})),
+        ])
+    headers_row = ["Date (UTC)", "Type", "Amount (XRP)", "Status", "Details"]
+    fname = f"xamanprotocol_transactions_{datetime.now(timezone.utc).strftime('%Y%m%d')}"
+
+    if fmt == "pdf":
+        from fpdf import FPDF
+        pdf = FPDF(orientation="L", unit="mm", format="A4")
+        pdf.add_page()
+        pdf.set_font("Helvetica", "B", 16)
+        pdf.cell(0, 10, "XamanProtocol - Transaction History", ln=True)
+        pdf.set_font("Helvetica", "", 9)
+        who = f"{user.get('first_name','')} {user.get('last_name','')} ({user.get('email') or user.get('username','')})"
+        pdf.cell(0, 6, who.strip(), ln=True)
+        pdf.cell(0, 6, f"Generated {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')} - {len(rows)} transactions", ln=True)
+        pdf.ln(2)
+        widths = [46, 32, 40, 26, 133]
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_fill_color(240, 243, 250)
+        for w, h in zip(widths, headers_row):
+            pdf.cell(w, 8, h, border=1, fill=True)
+        pdf.ln(8)
+        pdf.set_font("Helvetica", "", 8)
+        for r in rows:
+            for w, val in zip(widths, r):
+                s = str(val)
+                # truncate long detail cell to fit
+                maxc = int(w / 1.7)
+                if len(s) > maxc:
+                    s = s[: maxc - 3] + "..."
+                # core PDF fonts are latin-1 only; drop unsupported chars
+                s = s.encode("latin-1", "replace").decode("latin-1")
+                pdf.cell(w, 7, s, border=1)
+            pdf.ln(7)
+        out = pdf.output()
+        pdf_bytes = bytes(out)
+        return Response(content=pdf_bytes, media_type="application/pdf",
+                        headers={"Content-Disposition": f'attachment; filename="{fname}.pdf"'})
+
+    # default: CSV
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(headers_row)
+    writer.writerows(rows)
+    return Response(content=buf.getvalue(), media_type="text/csv",
+                    headers={"Content-Disposition": f'attachment; filename="{fname}.csv"'})
 
 
 # ---------------------------------------------------------------------------

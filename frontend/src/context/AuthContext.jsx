@@ -14,6 +14,11 @@ export function AuthProvider({ children }) {
   const wsRef = useRef(null);
   const pollRef = useRef(null);
   const serverOffset = useRef(0);
+  const prefsRef = useRef({ matured: true, deposit: true, withdrawal: true, restake: true });
+
+  useEffect(() => {
+    if (user?.notify_prefs) prefsRef.current = user.notify_prefs;
+  }, [user]);
 
   const refresh = useCallback(async () => {
     if (!storage.getToken()) {
@@ -51,21 +56,22 @@ export function AuthProvider({ children }) {
           if (msg.type === "notify") {
             refresh();
             window.dispatchEvent(new CustomEvent("xp-refresh", { detail: msg }));
+            const p = prefsRef.current || {};
             if (msg.event === "deposit_confirmed") {
               const body = `${Number(msg.amount).toLocaleString()} XRP credited to your wallet.`;
-              pushNotify("Deposit confirmed ✅", body);
+              if (p.deposit !== false) pushNotify("Deposit confirmed ✅", body);
               toast.success(body);
             } else if (msg.event === "withdrawal_approved") {
               const body = `${Number(msg.amount).toLocaleString()} XRP withdrawal approved.`;
-              pushNotify("Withdrawal approved ✅", body);
+              if (p.withdrawal !== false) pushNotify("Withdrawal approved ✅", body);
               toast.success(body);
             } else if (msg.event === "stake_matured") {
               const body = `Your stake matured — ${Number(msg.amount).toLocaleString()} XRP returned to your balance.`;
-              pushNotify("Stake completed 🎉", body);
+              if (p.matured !== false) pushNotify("Stake completed 🎉", body);
               toast.success(body);
             } else if (msg.event === "auto_restake") {
               const body = `Auto-restaked ${Number(msg.amount).toLocaleString()} XRP of profit into a new vault.`;
-              pushNotify("Auto-restake ♻️", body);
+              if (p.restake !== false) pushNotify("Auto-restake ♻️", body);
               toast.success(body);
             }
           } else if (msg.type === "state_updated" || msg.type === "admin_updated") {

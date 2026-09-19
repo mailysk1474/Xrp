@@ -16,6 +16,7 @@ import VaultsPage from "@/pages/VaultsPage";
 import Deposit from "@/pages/Deposit";
 import Withdraw from "@/pages/Withdraw";
 import History from "@/pages/History";
+import Settings from "@/pages/Settings";
 import Admin from "@/pages/Admin";
 import { AppShell } from "@/components/AppShell";
 
@@ -61,6 +62,7 @@ function AppRoutes() {
         <Route path="deposit" element={<Deposit />} />
         <Route path="withdraw" element={<Withdraw />} />
         <Route path="history" element={<History />} />
+        <Route path="settings" element={<Settings />} />
       </Route>
       <Route
         path="/admin"

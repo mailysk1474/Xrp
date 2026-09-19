@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { api } from "@/lib/api";
+import { toast } from "sonner";
+import { api, apiError, downloadTransactions } from "@/lib/api";
 import { usePrice } from "@/context/PriceContext";
 import { fmtXRP, fmtDate, xrpToUsdLabel } from "@/lib/format";
-import { ArrowDownToLine, ArrowUpFromLine, Layers, Sparkles, Settings2, Receipt, LogOut, CheckCircle2 } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, Layers, Sparkles, Settings2, Receipt, LogOut, CheckCircle2, FileSpreadsheet, FileText, Loader2 } from "lucide-react";
 
 const TYPE_META = {
   deposit: { label: "Deposit", icon: ArrowDownToLine, color: "#059669", sign: "+" },
@@ -24,6 +25,7 @@ const STATUS_META = {
 
 export default function History() {
   const [txns, setTxns] = useState(null);
+  const [busy, setBusy] = useState("");
   const { rate } = usePrice();
 
   const load = useCallback(() => {
@@ -37,9 +39,35 @@ export default function History() {
     return () => window.removeEventListener("xp-refresh", handler);
   }, [load]);
 
+  const exportTxns = async (fmt) => {
+    setBusy(fmt);
+    try {
+      await downloadTransactions(fmt);
+      toast.success(`${fmt.toUpperCase()} downloaded`);
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const hasTxns = Array.isArray(txns) && txns.length > 0;
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-slate-900">Transaction History</h1>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h1 className="text-2xl font-bold text-slate-900">Transaction History</h1>
+        {hasTxns && (
+          <div className="flex gap-2">
+            <button onClick={() => exportTxns("csv")} disabled={!!busy} data-testid="history-export-csv" className="inline-flex items-center gap-1.5 bg-white border border-slate-300 hover:border-blue-400 text-slate-800 text-sm font-semibold px-3.5 py-2 rounded-xl transition-colors disabled:opacity-50">
+              {busy === "csv" ? <Loader2 size={15} className="animate-spin" /> : <FileSpreadsheet size={15} className="text-emerald-600" />} CSV
+            </button>
+            <button onClick={() => exportTxns("pdf")} disabled={!!busy} data-testid="history-export-pdf" className="inline-flex items-center gap-1.5 bg-white border border-slate-300 hover:border-blue-400 text-slate-800 text-sm font-semibold px-3.5 py-2 rounded-xl transition-colors disabled:opacity-50">
+              {busy === "pdf" ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} className="text-red-600" />} PDF
+            </button>
+          </div>
+        )}
+      </div>
 
       {txns === null ? (
         <div className="flex justify-center py-16"><div className="w-8 h-8 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin" /></div>

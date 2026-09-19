@@ -10,7 +10,7 @@ import secrets
 from typing import Dict, Any
 
 # Base URL from frontend/.env
-BASE_URL = "https://startup-hub-636.preview.emergentagent.com/api"
+BASE_URL = "https://fe04b4a1-fce2-4d5a-915d-be8c6deb4bc7.preview.emergentagent.com/api"
 
 # Admin credentials from test_credentials.md
 ADMIN_EMAIL = "admin@xamanprotocol.com"
@@ -634,12 +634,303 @@ class TestFlexibleVaultStopStake:
             return False
 
 
+class TestUserSelfService:
+    """Test user self-service endpoints: update-profile, change-password, notification prefs, transaction export"""
+    def __init__(self):
+        self.user_token = None
+        self.user_id = None
+        self.user_email = None
+        self.user_password = "InitialPass123"
+        self.new_password = "NewSecurePass456"
+        
+    def case_1_register_fresh_user(self):
+        """Case 1: Register a fresh user for self-service testing"""
+        log("\n=== CASE 1: Register Fresh User ===")
+        random_suffix = secrets.token_hex(4)
+        self.user_email = f"selfservice_{random_suffix}@example.com"
+        
+        resp = requests.post(f"{BASE_URL}/auth/register", json={
+            "first_name": "Sarah",
+            "last_name": "Johnson",
+            "email": self.user_email,
+            "password": self.user_password
+        })
+        
+        assert_eq(resp.status_code, 200, "User registration")
+        data = resp.json()
+        self.user_token = data["token"]
+        self.user_id = data["user"]["id"]
+        log(f"✓ User registered: email={self.user_email}, id={self.user_id}")
+        
+    def case_2_update_profile_happy_path(self):
+        """Case 2: POST /api/auth/update-profile with valid names -> 200"""
+        log("\n=== CASE 2: Update Profile - Happy Path ===")
+        
+        resp = requests.post(
+            f"{BASE_URL}/auth/update-profile",
+            json={"first_name": "Sarah Marie", "last_name": "Johnson-Smith"},
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "Update profile returns 200")
+        data = resp.json()
+        
+        assert_eq(data["ok"], True, "Response ok is true")
+        assert_in("user", data, "Response has user")
+        
+        user = data["user"]
+        assert_eq(user["first_name"], "Sarah Marie", "First name updated")
+        assert_eq(user["last_name"], "Johnson-Smith", "Last name updated")
+        
+        log(f"✓ Profile updated: first_name={user['first_name']}, last_name={user['last_name']}")
+        
+    def case_3_update_profile_blank_name(self):
+        """Case 3: POST /api/auth/update-profile with blank name -> 400"""
+        log("\n=== CASE 3: Update Profile - Blank Name ===")
+        
+        resp = requests.post(
+            f"{BASE_URL}/auth/update-profile",
+            json={"first_name": "", "last_name": "Johnson"},
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 400, "Blank first name returns 400")
+        detail = resp.json().get("detail", "")
+        assert_in("required", detail.lower(), "Error message mentions 'required'")
+        log(f"✓ Correctly rejected blank name: {detail}")
+        
+    def case_4_change_password_wrong_current(self):
+        """Case 4: POST /api/auth/change-password with wrong current_password -> 400"""
+        log("\n=== CASE 4: Change Password - Wrong Current Password ===")
+        
+        resp = requests.post(
+            f"{BASE_URL}/auth/change-password",
+            json={"current_password": "WrongPassword123", "new_password": "NewSecurePass456"},
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 400, "Wrong current password returns 400")
+        detail = resp.json().get("detail", "")
+        assert_in("incorrect", detail.lower(), "Error message mentions 'incorrect'")
+        log(f"✓ Correctly rejected wrong current password: {detail}")
+        
+    def case_5_change_password_short_new(self):
+        """Case 5: POST /api/auth/change-password with new_password < 8 chars -> 400"""
+        log("\n=== CASE 5: Change Password - Short New Password ===")
+        
+        resp = requests.post(
+            f"{BASE_URL}/auth/change-password",
+            json={"current_password": self.user_password, "new_password": "Short1"},
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 400, "Short new password returns 400")
+        detail = resp.json().get("detail", "")
+        assert_in("8 characters", detail.lower(), "Error message mentions '8 characters'")
+        log(f"✓ Correctly rejected short new password: {detail}")
+        
+    def case_6_change_password_happy_path(self):
+        """Case 6: POST /api/auth/change-password with correct current + valid new -> 200"""
+        log("\n=== CASE 6: Change Password - Happy Path ===")
+        
+        resp = requests.post(
+            f"{BASE_URL}/auth/change-password",
+            json={"current_password": self.user_password, "new_password": self.new_password},
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "Change password returns 200")
+        data = resp.json()
+        assert_eq(data["ok"], True, "Response ok is true")
+        
+        log(f"✓ Password changed successfully")
+        
+    def case_7_verify_new_password_login(self):
+        """Case 7: Verify login with NEW password works, OLD password fails"""
+        log("\n=== CASE 7: Verify New Password Login ===")
+        
+        # Test login with NEW password
+        log("Testing login with NEW password...")
+        resp = requests.post(f"{BASE_URL}/auth/login", json={
+            "email": self.user_email,
+            "password": self.new_password
+        })
+        
+        assert_eq(resp.status_code, 200, "Login with new password returns 200")
+        data = resp.json()
+        assert_in("token", data, "Login response has token")
+        log(f"✓ Login successful with NEW password")
+        
+        # Test login with OLD password
+        log("Testing login with OLD password...")
+        resp = requests.post(f"{BASE_URL}/auth/login", json={
+            "email": self.user_email,
+            "password": self.user_password
+        })
+        
+        assert_eq(resp.status_code, 401, "Login with old password returns 401")
+        log(f"✓ Login correctly rejected OLD password: {resp.json().get('detail', '')}")
+        
+    def case_8_set_notification_prefs(self):
+        """Case 8: PUT /api/notifications/prefs -> 200 with prefs echoed"""
+        log("\n=== CASE 8: Set Notification Preferences ===")
+        
+        prefs = {
+            "matured": True,
+            "deposit": False,
+            "withdrawal": True,
+            "restake": False
+        }
+        
+        resp = requests.put(
+            f"{BASE_URL}/notifications/prefs",
+            json=prefs,
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "Set notification prefs returns 200")
+        data = resp.json()
+        
+        assert_eq(data["ok"], True, "Response ok is true")
+        assert_in("notify_prefs", data, "Response has notify_prefs")
+        
+        notify_prefs = data["notify_prefs"]
+        assert_eq(notify_prefs["matured"], True, "matured pref is True")
+        assert_eq(notify_prefs["deposit"], False, "deposit pref is False")
+        assert_eq(notify_prefs["withdrawal"], True, "withdrawal pref is True")
+        assert_eq(notify_prefs["restake"], False, "restake pref is False")
+        
+        log(f"✓ Notification prefs set: {notify_prefs}")
+        
+    def case_9_verify_prefs_in_state(self):
+        """Case 9: GET /api/state confirms user.notify_prefs matches what was set"""
+        log("\n=== CASE 9: Verify Prefs in GET /api/state ===")
+        
+        resp = requests.get(
+            f"{BASE_URL}/state",
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "GET /api/state returns 200")
+        data = resp.json()
+        
+        assert_in("user", data, "State response has user")
+        user = data["user"]
+        assert_in("notify_prefs", user, "User has notify_prefs")
+        
+        notify_prefs = user["notify_prefs"]
+        assert_eq(notify_prefs["matured"], True, "matured pref persisted")
+        assert_eq(notify_prefs["deposit"], False, "deposit pref persisted")
+        assert_eq(notify_prefs["withdrawal"], True, "withdrawal pref persisted")
+        assert_eq(notify_prefs["restake"], False, "restake pref persisted")
+        
+        log(f"✓ Notification prefs persisted in state: {notify_prefs}")
+        
+    def case_10_export_csv(self):
+        """Case 10: GET /api/transactions/export?fmt=csv -> 200 text/csv with correct header"""
+        log("\n=== CASE 10: Export Transactions CSV ===")
+        
+        resp = requests.get(
+            f"{BASE_URL}/transactions/export?fmt=csv",
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "Export CSV returns 200")
+        
+        # Verify Content-Type
+        content_type = resp.headers.get("Content-Type", "")
+        assert_in("text/csv", content_type, "Content-Type is text/csv")
+        
+        # Verify CSV header row
+        csv_content = resp.text
+        lines = csv_content.strip().split("\n")
+        assert_true(len(lines) >= 1, "CSV has at least header row")
+        
+        header = lines[0]
+        expected_header = "Date (UTC),Type,Amount (XRP),Status,Details"
+        assert_eq(header, expected_header, "CSV header matches expected")
+        
+        log(f"✓ CSV export successful: Content-Type={content_type}, header={header}")
+        
+    def case_11_export_pdf(self):
+        """Case 11: GET /api/transactions/export?fmt=pdf -> 200 application/pdf starting with %PDF"""
+        log("\n=== CASE 11: Export Transactions PDF ===")
+        
+        resp = requests.get(
+            f"{BASE_URL}/transactions/export?fmt=pdf",
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "Export PDF returns 200")
+        
+        # Verify Content-Type
+        content_type = resp.headers.get("Content-Type", "")
+        assert_in("application/pdf", content_type, "Content-Type is application/pdf")
+        
+        # Verify PDF magic bytes
+        pdf_content = resp.content
+        assert_true(len(pdf_content) > 4, "PDF content is not empty")
+        
+        pdf_header = pdf_content[:4].decode("latin-1", errors="ignore")
+        assert_eq(pdf_header, "%PDF", "PDF starts with %PDF magic bytes")
+        
+        log(f"✓ PDF export successful: Content-Type={content_type}, starts with {pdf_header}")
+        
+    def case_12_export_without_auth(self):
+        """Case 12: GET /api/transactions/export without Authorization -> 401/403"""
+        log("\n=== CASE 12: Export Without Authorization ===")
+        
+        # Test CSV without auth
+        resp = requests.get(f"{BASE_URL}/transactions/export?fmt=csv")
+        assert_true(resp.status_code in [401, 403], f"CSV export without auth returns 401/403 (got {resp.status_code})")
+        log(f"✓ CSV export correctly requires auth: {resp.status_code}")
+        
+        # Test PDF without auth
+        resp = requests.get(f"{BASE_URL}/transactions/export?fmt=pdf")
+        assert_true(resp.status_code in [401, 403], f"PDF export without auth returns 401/403 (got {resp.status_code})")
+        log(f"✓ PDF export correctly requires auth: {resp.status_code}")
+        
+    def run_all_tests(self):
+        """Run all test cases"""
+        try:
+            self.case_1_register_fresh_user()
+            self.case_2_update_profile_happy_path()
+            self.case_3_update_profile_blank_name()
+            self.case_4_change_password_wrong_current()
+            self.case_5_change_password_short_new()
+            self.case_6_change_password_happy_path()
+            self.case_7_verify_new_password_login()
+            self.case_8_set_notification_prefs()
+            self.case_9_verify_prefs_in_state()
+            self.case_10_export_csv()
+            self.case_11_export_pdf()
+            self.case_12_export_without_auth()
+            
+            log("\n" + "="*60)
+            log("✅ ALL 12 USER SELF-SERVICE TEST CASES PASSED")
+            log("="*60)
+            return True
+            
+        except AssertionError as e:
+            log(f"\n❌ TEST FAILED: {e}")
+            return False
+        except Exception as e:
+            log(f"\n❌ UNEXPECTED ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+
 if __name__ == "__main__":
     import sys
     
     if len(sys.argv) > 1 and sys.argv[1] == "flex":
         # Run flexible vault stop stake tests
         tester = TestFlexibleVaultStopStake()
+        success = tester.run_all_tests()
+    elif len(sys.argv) > 1 and sys.argv[1] == "selfservice":
+        # Run user self-service tests
+        tester = TestUserSelfService()
         success = tester.run_all_tests()
     else:
         # Run auth tests by default

@@ -3,7 +3,7 @@ import { useAuth } from "@/context/AuthContext";
 import { usePrice } from "@/context/PriceContext";
 import { fmtUSD } from "@/lib/format";
 import { Logo } from "@/components/Logo";
-import { LayoutDashboard, Layers, ArrowDownToLine, ArrowUpFromLine, Receipt, Lock, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, Layers, ArrowDownToLine, ArrowUpFromLine, Receipt, Lock, ShieldCheck, Settings } from "lucide-react";
 
 const navItems = [
   { to: "/app", label: "Dashboard", icon: LayoutDashboard, end: true, testid: "nav-dashboard" },
@@ -44,6 +44,19 @@ export function AppShell() {
                 <ShieldCheck size={14} /> Admin
               </NavLink>
             )}
+            <NavLink
+              to="/app/settings"
+              data-testid="nav-settings-link"
+              className={({ isActive }) =>
+                `flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg border transition-colors ${
+                  isActive
+                    ? "bg-blue-50 text-[#0030cf] border-blue-200"
+                    : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                }`
+              }
+            >
+              <Settings size={14} /> <span className="hidden sm:inline">Settings</span>
+            </NavLink>
             <button
               onClick={onLock}
               data-testid="lock-session-button"
