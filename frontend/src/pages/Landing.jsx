@@ -288,10 +288,10 @@ const CALC_VAULTS = [
 ];
 
 const TIERS_TABLE = [
-  { tier: "Starter", min: "0", flagship: "XRP Flex · 5.2%", lock: "Flexible", color: "#64748B" },
-  { tier: "Silver", min: "1,000", flagship: "VIP Silver · 19.2%", lock: "30 days", color: "#64748B" },
-  { tier: "Gold", min: "5,000", flagship: "VIP Gold · 38.4%", lock: "45 days", color: "#D97706" },
-  { tier: "Platinum", min: "25,000", flagship: "VIP Platinum · 83.6%", lock: "60 days", color: "#475569" },
+  { tier: "Starter", min: "0", flagship: "XRP Flex · 19.99%", lock: "Flexible", color: "#64748B" },
+  { tier: "Silver", min: "1,000", flagship: "VIP Silver · 29.99%", lock: "30 days", color: "#64748B" },
+  { tier: "Gold", min: "5,000", flagship: "VIP Gold · 49.99%", lock: "45 days", color: "#D97706" },
+  { tier: "Platinum", min: "25,000", flagship: "VIP Platinum · 89.99%", lock: "60 days", color: "#475569" },
   { tier: "Diamond", min: "100,000", flagship: "VIP Diamond · 156%", lock: "90 days", color: "#9333EA" },
 ];
 
@@ -476,10 +476,10 @@ export default function Landing() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { n: "XRP Flex", a: "5.2%", t: "Flexible" },
-                { n: "VIP Silver", a: "19.2%", t: "30 days" },
-                { n: "VIP Gold", a: "38.4%", t: "45 days" },
-                { n: "VIP Platinum", a: "83.6%", t: "60 days" },
+                { n: "XRP Flex", a: "19.99%", t: "18 days" },
+                { n: "VIP Silver", a: "29.99%", t: "30 days" },
+                { n: "VIP Gold", a: "49.99%", t: "45 days" },
+                { n: "VIP Platinum", a: "89.99%", t: "60 days" },
                 { n: "VIP Diamond", a: "156%", t: "90 days" },
                 { n: "Live accrual", a: "24/7", t: "Every second" },
               ].map((v, i) => (
