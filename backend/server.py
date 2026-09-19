@@ -352,6 +352,7 @@ def public_user(user: dict) -> dict:
         "auto_restake": user.get("auto_restake", {"enabled": False, "threshold": None, "vault_key": None}),
         "notify_prefs": user.get("notify_prefs", {"matured": True, "deposit": True, "withdrawal": True, "restake": True}),
         "has_password": bool(user.get("password_hash")),
+        "last_login": user.get("last_login"),
         "created_at": user.get("created_at"),
     }
 
@@ -624,6 +625,7 @@ async def login(body: LoginReq):
     user = await db.users.find_one({"email": email})
     if not user or not user.get("password_hash") or not verify_password(body.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid email or password.")
+    await db.users.update_one({"_id": user["_id"]}, {"$set": {"last_login": now_iso()}})
     token = create_token(str(user["_id"]), user.get("role", "user"))
     return {"token": token, "user": public_user(user)}
 
@@ -634,6 +636,7 @@ async def recover(body: RecoverReq):
     user = await db.users.find_one({"email": email})
     if not user or not verify_phrase(body.phrase, user["phrase_hash"]):
         raise HTTPException(status_code=401, detail="Invalid email or recovery phrase.")
+    await db.users.update_one({"_id": user["_id"]}, {"$set": {"last_login": now_iso()}})
     token = create_token(str(user["_id"]), user.get("role", "user"))
     return {"token": token, "user": public_user(user)}
 
@@ -1025,6 +1028,28 @@ async def withdraw(body: AmountReq, user: dict = Depends(require_active_user)):
 # ---------------------------------------------------------------------------
 # Admin endpoints
 # ---------------------------------------------------------------------------
+@api.get("/admin/stats")
+async def admin_stats(admin: dict = Depends(require_admin)):
+    total_users = await db.users.count_documents({})
+    bal_agg = await db.users.aggregate([{"$group": {"_id": None, "total": {"$sum": "$balance"}}}]).to_list(1)
+    total_balance = round(bal_agg[0]["total"], 6) if bal_agg else 0.0
+    stk_agg = await db.stakes.aggregate([
+        {"$match": {"principal": {"$gt": 0}, "status": {"$nin": ["completed", "exited"]}}},
+        {"$group": {"_id": None, "total": {"$sum": "$principal"}}},
+    ]).to_list(1)
+    total_staked = round(stk_agg[0]["total"], 6) if stk_agg else 0.0
+    pending_deposits = await db.transactions.count_documents({"type": "deposit", "status": "pending"})
+    pending_withdrawals = await db.transactions.count_documents({"type": "withdrawal", "status": "pending"})
+    return {
+        "total_users": total_users,
+        "total_balance": total_balance,
+        "total_staked": total_staked,
+        "aum": round(total_balance + total_staked, 6),
+        "pending_deposits": pending_deposits,
+        "pending_withdrawals": pending_withdrawals,
+    }
+
+
 @api.get("/admin/users")
 async def admin_users(admin: dict = Depends(require_admin)):
     users = await db.users.find({}).sort("created_at", -1).to_list(1000)

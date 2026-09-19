@@ -106,6 +106,20 @@ user_problem_statement: |
   PWA/responsive layout bug fix verification: When installed to Home Screen (standalone/PWA mode), the header looked bad and content was getting cut off at the top (notch/status-bar area). Fix added CSS safe-area-inset padding (.safe-top / .safe-x) to all top headers and mobile bottom nav, plus viewport-fit=cover. Verify layout stability and no content clipping across mobile (390x844), tablet (768x1024), and desktop (1920x800) viewports.
 
 backend:
+  - task: "Admin stats endpoint + last_login tracking"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "NEW: GET /api/admin/stats (admin-only) returns {total_users, total_balance, total_staked, aum, pending_deposits, pending_withdrawals}. Also POST /api/auth/login and /api/auth/recover now set user.last_login (ISO) and public_user exposes last_login. Please test: (1) GET /api/admin/stats with admin token -> 200 with all 6 fields; aum == total_balance+total_staked (within rounding); counts non-negative ints. (2) GET /api/admin/stats with NO auth -> 401/403; with a NON-admin user token -> 403. (3) Register a fresh user then LOGIN with them; GET /api/admin/users (admin) and confirm that user's last_login is now a non-null ISO timestamp. Admin creds: admin@xamanprotocol.com / XamanAdmin2025! (do not change admin password)."
+        -working: true
+        -agent: "testing"
+        -comment: "✅ VERIFIED: All 4 test cases PASSED. (1) GET /api/admin/stats with admin token returns 200 with all 6 required numeric fields: total_users=10 (int), total_balance=12038497.173423 (float), total_staked=697000.0 (float), aum=12735497.173423 (float), pending_deposits=1 (int), pending_withdrawals=1 (int). AUM calculation verified correct: aum (12735497.173423) == total_balance (12038497.173423) + total_staked (697000.0) with diff=0.0 (within 0.01 tolerance). All counts are non-negative and total_users >= 1. (2) GET /api/admin/stats without Authorization header correctly returns 401 'Not authenticated'. (3) GET /api/admin/stats with non-admin user token correctly returns 403 'Admin access required'. Registered non-admin user: nonadmin_64db8a23@example.com (id=6aaeb4c7f9af58f492552a0d). (4) last_login tracking verified: Registered user lastlogin_b9f15141@example.com (id=6aaeb4c8f9af58f492552a0e), logged in, then GET /api/admin/users with admin token confirmed user's last_login field is non-null ISO timestamp string: '2026-09-19T16:14:01.005645+00:00'. All authentication guards, field validations, and last_login tracking working correctly."
   - task: "Vault minimum-stake ladder increase"
     implemented: true
     working: true
@@ -213,8 +227,8 @@ frontend:
 
 metadata:
   created_by: "main_agent"
-  version: "1.9"
-  test_sequence: 7
+  version: "2.0"
+  test_sequence: 8
   run_ui: false
 
 test_plan:
@@ -225,7 +239,11 @@ test_plan:
 
 agent_communication:
     -agent: "main"
-    -message: "NEW user self-service backend endpoints added (change-password, update-profile, notifications/prefs, transactions/export csv+pdf). All require a valid user Bearer token. I manually verified them via curl with the admin token and they work. Please run automated backend tests focusing ONLY on these 4 endpoints as described in the task status_history. Admin creds: admin@xamanprotocol.com / XamanAdmin2025! (you can also register a fresh test user via POST /api/auth/register). Do NOT change the admin's password during tests (or set it back to XamanAdmin2025! afterward)."
+    -message: "NEW: GET /api/admin/stats (admin-only) returns {total_users, total_balance, total_staked, aum, pending_deposits, pending_withdrawals}. Also POST /api/auth/login and /api/auth/recover now set user.last_login (ISO) and public_user exposes last_login. Please test: (1) GET /api/admin/stats with admin token -> 200 with all 6 fields; aum == total_balance+total_staked (within rounding); counts non-negative ints. (2) GET /api/admin/stats with NO auth -> 401/403; with a NON-admin user token -> 403. (3) Register a fresh user then LOGIN with them; GET /api/admin/users (admin) and confirm that user's last_login is now a non-null ISO timestamp. Admin creds: admin@xamanprotocol.com / XamanAdmin2025! (do not change admin password)."
+
+agent_communication:
+    -agent: "testing"
+    -message: "✅ ADMIN STATS & LAST_LOGIN TRACKING VERIFIED SUCCESSFULLY. All 4 test cases PASSED. (1) GET /api/admin/stats with admin token returns 200 with all 6 required numeric fields correctly populated and typed. AUM calculation verified: aum == total_balance + total_staked (diff=0.0, within 0.01 tolerance). All counts non-negative, total_users >= 1. (2) Auth guards working: without Authorization header returns 401 'Not authenticated', with non-admin user token returns 403 'Admin access required'. (3) last_login tracking working: after user login, GET /api/admin/users shows user's last_login as non-null ISO timestamp string '2026-09-19T16:14:01.005645+00:00'. Test users created: nonadmin_64db8a23@example.com (id=6aaeb4c7f9af58f492552a0d), lastlogin_b9f15141@example.com (id=6aaeb4c8f9af58f492552a0e). All admin stats endpoint functionality and last_login tracking are production-ready."
 
 agent_communication:
     -agent: "main"

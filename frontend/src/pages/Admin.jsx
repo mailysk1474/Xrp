@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Users, ArrowDownToLine, ArrowUpFromLine, ScrollText, Lock, Search,
-  Loader2, Check, X, Crown, Plus, Minus, Sliders, LayoutDashboard, Layers, Mail, Copy,
+  Loader2, Check, X, Crown, Plus, Minus, Sliders, LayoutDashboard, Layers, Mail, Copy, Wallet, Clock,
 } from "lucide-react";
 
 const TIERS = ["auto", "starter", "silver", "gold", "platinum", "diamond"];
@@ -39,6 +39,7 @@ export default function Admin() {
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         <h1 className="text-2xl font-bold text-slate-900 mb-5">Control Center</h1>
+        <StatsHeader />
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="bg-white border border-slate-200 p-1 rounded-xl flex-wrap h-auto">
             <TabsTrigger value="users" data-testid="admin-tab-users" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg text-slate-600"><Users size={15} className="mr-1.5" /> Users</TabsTrigger>
@@ -65,6 +66,48 @@ function useRefreshOn(load) {
     window.addEventListener("xp-refresh", h);
     return () => window.removeEventListener("xp-refresh", h);
   }, [load]);
+}
+
+const STAT_ACCENTS = {
+  blue: "bg-blue-50 text-[#0030cf] border-blue-100",
+  violet: "bg-violet-50 text-violet-600 border-violet-100",
+  emerald: "bg-emerald-50 text-emerald-600 border-emerald-100",
+  amber: "bg-amber-50 text-amber-600 border-amber-100",
+};
+
+function StatCard({ icon: Icon, label, value, sub, accent = "blue", badge, testid }) {
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm" data-testid={testid}>
+      <div className="flex items-center justify-between">
+        <div className={`w-9 h-9 rounded-xl border flex items-center justify-center ${STAT_ACCENTS[accent]}`}>
+          <Icon size={16} />
+        </div>
+        {badge > 0 ? (
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500 text-white">{badge}</span>
+        ) : null}
+      </div>
+      <p className="text-2xl font-bold text-slate-900 mt-3 font-mono tabular-nums leading-none">{value}</p>
+      <p className="text-xs text-slate-500 mt-1.5">{label}</p>
+      {sub ? <p className="text-[11px] text-slate-400 mt-0.5 font-mono">{sub}</p> : null}
+    </div>
+  );
+}
+
+function StatsHeader() {
+  const [s, setS] = useState(null);
+  const load = useCallback(() => {
+    api.get("/admin/stats").then(({ data }) => setS(data)).catch(() => {});
+  }, []);
+  useRefreshOn(load);
+
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6" data-testid="admin-stats">
+      <StatCard testid="stat-total-users" icon={Users} accent="blue" label="Total users" value={s ? s.total_users : "—"} />
+      <StatCard testid="stat-aum" icon={Wallet} accent="violet" label="XRP under management" value={s ? fmtXRP(s.aum, 0) : "—"} sub={s ? `${fmtXRP(s.total_balance, 0)} bal · ${fmtXRP(s.total_staked, 0)} staked` : ""} />
+      <StatCard testid="stat-pending-deposits" icon={ArrowDownToLine} accent="emerald" label="Pending deposits" value={s ? s.pending_deposits : "—"} badge={s ? s.pending_deposits : 0} />
+      <StatCard testid="stat-pending-withdrawals" icon={ArrowUpFromLine} accent="amber" label="Pending withdrawals" value={s ? s.pending_withdrawals : "—"} badge={s ? s.pending_withdrawals : 0} />
+    </div>
+  );
 }
 
 function UsersTab() {
@@ -113,6 +156,9 @@ function UsersTab() {
                     {u.withdrawals_disabled && <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200">W-Disabled</span>}
                     {u.role === "admin" && <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-[#0030cf] border border-blue-200">Admin</span>}
                   </div>
+                  <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1" data-testid={`admin-user-lastlogin-${u.username}`}>
+                    <Clock size={10} className="shrink-0" /> {u.last_login ? `Last login ${fmtDate(u.last_login)}` : "Never logged in"}
+                  </p>
                 </div>
                 <div className="text-right">
                   <p className="font-mono font-semibold text-slate-900 text-sm">{fmtXRP(u.balance)} XRP</p>
@@ -175,6 +221,9 @@ function UserDetailDialog({ userId, onClose, onChange }) {
               <Mail size={13} className="text-slate-400" /> {u.email} <Copy size={12} className="opacity-60" />
             </button>
           )}
+          <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-400" data-testid="admin-detail-lastlogin">
+            <Clock size={12} /> {u?.last_login ? `Last login ${fmtDate(u.last_login)}` : "Never logged in"}
+          </p>
         </DialogHeader>
 
         {!detail ? (

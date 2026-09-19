@@ -921,6 +921,197 @@ class TestUserSelfService:
             return False
 
 
+class TestAdminStatsAndLastLogin:
+    """Test admin stats endpoint and last_login tracking"""
+    def __init__(self):
+        self.admin_token = None
+        self.user_token = None
+        self.user_id = None
+        self.user_email = None
+        
+    def setup_admin_token(self):
+        """Get admin token"""
+        log("\n=== SETUP: Admin Login ===")
+        resp = requests.post(f"{BASE_URL}/auth/login", json={
+            "email": ADMIN_EMAIL,
+            "password": ADMIN_PASSWORD
+        })
+        assert_eq(resp.status_code, 200, "Admin login")
+        self.admin_token = resp.json()["token"]
+        log(f"✓ Admin token obtained")
+        
+    def case_1_admin_stats_with_admin_token(self):
+        """Case 1: GET /api/admin/stats with admin token -> 200 with all 6 fields"""
+        log("\n=== CASE 1: GET /api/admin/stats with Admin Token ===")
+        
+        resp = requests.get(
+            f"{BASE_URL}/admin/stats",
+            headers={"Authorization": f"Bearer {self.admin_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "GET /api/admin/stats returns 200")
+        data = resp.json()
+        
+        # Verify all 6 required fields are present
+        assert_in("total_users", data, "Response has total_users")
+        assert_in("total_balance", data, "Response has total_balance")
+        assert_in("total_staked", data, "Response has total_staked")
+        assert_in("aum", data, "Response has aum")
+        assert_in("pending_deposits", data, "Response has pending_deposits")
+        assert_in("pending_withdrawals", data, "Response has pending_withdrawals")
+        
+        # Verify all fields are numeric
+        total_users = data["total_users"]
+        total_balance = data["total_balance"]
+        total_staked = data["total_staked"]
+        aum = data["aum"]
+        pending_deposits = data["pending_deposits"]
+        pending_withdrawals = data["pending_withdrawals"]
+        
+        assert_true(isinstance(total_users, int), f"total_users is int (got {type(total_users).__name__})")
+        assert_true(isinstance(total_balance, (int, float)), f"total_balance is numeric (got {type(total_balance).__name__})")
+        assert_true(isinstance(total_staked, (int, float)), f"total_staked is numeric (got {type(total_staked).__name__})")
+        assert_true(isinstance(aum, (int, float)), f"aum is numeric (got {type(aum).__name__})")
+        assert_true(isinstance(pending_deposits, int), f"pending_deposits is int (got {type(pending_deposits).__name__})")
+        assert_true(isinstance(pending_withdrawals, int), f"pending_withdrawals is int (got {type(pending_withdrawals).__name__})")
+        
+        log(f"✓ All 6 fields present and numeric: total_users={total_users}, total_balance={total_balance}, total_staked={total_staked}, aum={aum}, pending_deposits={pending_deposits}, pending_withdrawals={pending_withdrawals}")
+        
+        # Verify aum == total_balance + total_staked (within 0.01 rounding)
+        expected_aum = total_balance + total_staked
+        aum_diff = abs(aum - expected_aum)
+        assert_true(aum_diff < 0.01, f"aum ({aum}) == total_balance ({total_balance}) + total_staked ({total_staked}) = {expected_aum} (diff={aum_diff})")
+        log(f"✓ aum calculation correct: {aum} == {total_balance} + {total_staked} (diff={aum_diff})")
+        
+        # Verify non-negative counts
+        assert_true(total_users >= 1, f"total_users ({total_users}) >= 1")
+        assert_true(pending_deposits >= 0, f"pending_deposits ({pending_deposits}) >= 0")
+        assert_true(pending_withdrawals >= 0, f"pending_withdrawals ({pending_withdrawals}) >= 0")
+        log(f"✓ All counts are non-negative and total_users >= 1")
+        
+    def case_2_admin_stats_without_auth(self):
+        """Case 2: GET /api/admin/stats without Authorization header -> 401/403"""
+        log("\n=== CASE 2: GET /api/admin/stats Without Authorization ===")
+        
+        resp = requests.get(f"{BASE_URL}/admin/stats")
+        
+        assert_true(resp.status_code in [401, 403], f"Without auth returns 401/403 (got {resp.status_code})")
+        log(f"✓ Correctly rejected request without auth: {resp.status_code} - {resp.json().get('detail', '')}")
+        
+    def case_3_admin_stats_with_non_admin_token(self):
+        """Case 3: Register non-admin user and GET /api/admin/stats with their token -> 403"""
+        log("\n=== CASE 3: GET /api/admin/stats with Non-Admin Token ===")
+        
+        # Register a fresh non-admin user
+        random_suffix = secrets.token_hex(4)
+        self.user_email = f"nonadmin_{random_suffix}@example.com"
+        
+        resp = requests.post(f"{BASE_URL}/auth/register", json={
+            "first_name": "Regular",
+            "last_name": "User",
+            "email": self.user_email,
+            "password": "regularuser123"
+        })
+        
+        assert_eq(resp.status_code, 200, "Non-admin user registration")
+        data = resp.json()
+        self.user_token = data["token"]
+        self.user_id = data["user"]["id"]
+        log(f"✓ Non-admin user registered: email={self.user_email}, id={self.user_id}")
+        
+        # Try to access admin stats with non-admin token
+        resp = requests.get(
+            f"{BASE_URL}/admin/stats",
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 403, "Non-admin user gets 403")
+        log(f"✓ Correctly rejected non-admin user: {resp.json().get('detail', '')}")
+        
+    def case_4_last_login_tracking(self):
+        """Case 4: Register user, login, verify last_login is set in GET /api/admin/users"""
+        log("\n=== CASE 4: Last Login Tracking ===")
+        
+        # Register another fresh user
+        random_suffix = secrets.token_hex(4)
+        test_email = f"lastlogin_{random_suffix}@example.com"
+        test_password = "testpass123"
+        
+        resp = requests.post(f"{BASE_URL}/auth/register", json={
+            "first_name": "Last",
+            "last_name": "Login",
+            "email": test_email,
+            "password": test_password
+        })
+        
+        assert_eq(resp.status_code, 200, "User registration")
+        test_user_id = resp.json()["user"]["id"]
+        log(f"✓ User registered: email={test_email}, id={test_user_id}")
+        
+        # Login with this user to trigger last_login update
+        log("Logging in to trigger last_login update...")
+        resp = requests.post(f"{BASE_URL}/auth/login", json={
+            "email": test_email,
+            "password": test_password
+        })
+        
+        assert_eq(resp.status_code, 200, "User login")
+        log(f"✓ User logged in successfully")
+        
+        # Get admin users list and find this user
+        log("Fetching admin users list...")
+        resp = requests.get(
+            f"{BASE_URL}/admin/users",
+            headers={"Authorization": f"Bearer {self.admin_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "GET /api/admin/users returns 200")
+        data = resp.json()
+        assert_in("users", data, "Response has users")
+        
+        users = data["users"]
+        test_user = None
+        for u in users:
+            if u["id"] == test_user_id:
+                test_user = u
+                break
+        
+        assert_true(test_user is not None, f"Found user {test_user_id} in admin users list")
+        
+        # Verify last_login is not null and is an ISO timestamp string
+        last_login = test_user.get("last_login")
+        assert_true(last_login is not None, "last_login is not null")
+        assert_true(isinstance(last_login, str), f"last_login is a string (got {type(last_login).__name__})")
+        assert_true(len(last_login) > 0, "last_login is not empty")
+        
+        # Verify it's a valid ISO timestamp format (contains T and Z or +/-)
+        assert_true("T" in last_login, f"last_login ({last_login}) is ISO format with T separator")
+        log(f"✓ last_login is set and valid: {last_login}")
+        
+    def run_all_tests(self):
+        """Run all test cases"""
+        try:
+            self.setup_admin_token()
+            self.case_1_admin_stats_with_admin_token()
+            self.case_2_admin_stats_without_auth()
+            self.case_3_admin_stats_with_non_admin_token()
+            self.case_4_last_login_tracking()
+            
+            log("\n" + "="*60)
+            log("✅ ALL 4 ADMIN STATS & LAST_LOGIN TEST CASES PASSED")
+            log("="*60)
+            return True
+            
+        except AssertionError as e:
+            log(f"\n❌ TEST FAILED: {e}")
+            return False
+        except Exception as e:
+            log(f"\n❌ UNEXPECTED ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+
 if __name__ == "__main__":
     import sys
     
@@ -931,6 +1122,10 @@ if __name__ == "__main__":
     elif len(sys.argv) > 1 and sys.argv[1] == "selfservice":
         # Run user self-service tests
         tester = TestUserSelfService()
+        success = tester.run_all_tests()
+    elif len(sys.argv) > 1 and sys.argv[1] == "adminstats":
+        # Run admin stats and last_login tests
+        tester = TestAdminStatsAndLastLogin()
         success = tester.run_all_tests()
     else:
         # Run auth tests by default
