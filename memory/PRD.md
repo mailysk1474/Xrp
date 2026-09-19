@@ -21,6 +21,7 @@ Xaman-inspired light UI (white bg, near-black text, blue-primary + black-alterna
 - Full app: auth, dashboard, vaults, deposit/withdraw, history, admin, PWA, whitepaper
 - Compare Vaults dialog + Restake (compound profit into fresh stake) — /api/reinvest endpoint (internal type "reinvest")
 - 2026-06: Landing hero mockup redesigned to Mac (dashboard) + slim phone cluster; renamed user-facing "Reinvest" → "Restake" (button, dialog, confirm, toast, history label). Backend transaction type kept as "reinvest" internally.
+- 2026-09: Recovered env after reset (repointed to Atlas). Made landing hero SlimPhone photorealistic — titanium frame, side buttons, Dynamic Island, status bar (time/signal/wifi/battery), glossy reflection, home indicator.
 
 ## Backlog / pending
 - P1: Replace placeholder /app/frontend/public/whitepaper.pdf with user's real PDF when supplied

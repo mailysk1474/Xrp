@@ -7,7 +7,7 @@ import {
   ShieldCheck, KeyRound, Fingerprint, Layers, TrendingUp, Smartphone,
   Lock, Eye, ArrowRight, LogIn, CheckCircle2, Wallet, Crown, Clock,
   LayoutDashboard, ArrowDownToLine, ArrowUpFromLine, Receipt, Sparkles, LockKeyhole,
-  Coins, Percent, Timer, ArrowUp, Twitter, Send, Mail, FileText,
+  Coins, Percent, Timer, ArrowUp, Twitter, Send, Mail, FileText, Wifi,
 } from "lucide-react";
 import { openSupportChat } from "@/lib/support";
 import { InstallGuide } from "@/components/InstallGuide";
@@ -140,14 +140,60 @@ function MacMock() {
   );
 }
 
+/* tiny cellular-signal bars for the status bar */
+function SignalBars() {
+  return (
+    <span className="flex items-end gap-[1px] h-2">
+      {[2, 3, 4, 5].map((h, i) => (
+        <span key={i} className="w-[1.5px] rounded-[0.5px] bg-slate-900" style={{ height: `${h * 1.5}px` }} />
+      ))}
+    </span>
+  );
+}
+
 function SlimPhone() {
   return (
-    <div className="rounded-[2rem] border-[5px] border-slate-900 bg-slate-900 shadow-2xl" style={{ boxShadow: "0 30px 60px -18px rgba(15,23,42,0.5)" }}>
-      <div className="rounded-[1.65rem] overflow-hidden bg-[#F7F9FC] flex flex-col">
-        {/* notch */}
-        <div className="relative bg-white pt-2 pb-1 flex items-center justify-center">
-          <div className="w-10 h-1 rounded-full bg-slate-900" />
-        </div>
+    <div className="relative">
+      {/* physical side buttons */}
+      <div className="absolute left-[-2px] top-[86px] w-[2px] h-5 rounded-l-sm bg-slate-700/90" />
+      <div className="absolute left-[-2px] top-[116px] w-[2px] h-9 rounded-l-sm bg-slate-700/90" />
+      <div className="absolute left-[-2px] top-[160px] w-[2px] h-9 rounded-l-sm bg-slate-700/90" />
+      <div className="absolute right-[-2px] top-[140px] w-[2px] h-14 rounded-r-sm bg-slate-700/90" />
+
+      {/* titanium outer frame -> black inner bezel -> screen */}
+      <div
+        className="rounded-[2.3rem] p-[3px] bg-gradient-to-b from-slate-500 via-slate-700 to-slate-900"
+        style={{ boxShadow: "0 32px 60px -18px rgba(15,23,42,0.55), 0 2px 4px rgba(255,255,255,0.35) inset" }}
+      >
+        <div className="rounded-[2.1rem] p-[2px] bg-black">
+          <div className="relative rounded-[1.95rem] overflow-hidden bg-[#F7F9FC] flex flex-col">
+            {/* Dynamic Island */}
+            <div className="absolute top-[7px] left-1/2 -translate-x-1/2 z-30 w-[52px] h-[15px] rounded-full bg-black flex items-center justify-end pr-1.5">
+              <span className="w-[5px] h-[5px] rounded-full bg-slate-800 ring-[1.5px] ring-slate-900" />
+            </div>
+
+            {/* status bar */}
+            <div className="relative z-20 flex items-center justify-between px-3 pt-[7px] pb-1 bg-white">
+              <span className="text-[7px] font-bold text-slate-900 tracking-tight">9:41</span>
+              <span className="flex items-center gap-[3px]">
+                <SignalBars />
+                <Wifi size={8} strokeWidth={2.5} className="text-slate-900" />
+                {/* battery */}
+                <span className="flex items-center gap-[1px]">
+                  <span className="relative w-[12px] h-[6px] rounded-[2px] border border-slate-900/80 p-[1px]">
+                    <span className="block h-full w-[70%] rounded-[1px] bg-slate-900" />
+                  </span>
+                  <span className="w-[1px] h-[3px] rounded-r-sm bg-slate-900/80" />
+                </span>
+              </span>
+            </div>
+
+            {/* glossy screen reflection */}
+            <div
+              className="pointer-events-none absolute inset-0 z-20 rounded-[1.95rem]"
+              style={{ background: "linear-gradient(130deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0) 30%, rgba(255,255,255,0) 82%, rgba(255,255,255,0.12) 100%)" }}
+            />
+
         <div className="px-2.5 pt-2 pb-2.5 space-y-2.5 flex-1">
           <div className="flex items-center justify-between">
             <div>
@@ -202,8 +248,14 @@ function SlimPhone() {
 
         <div className="grid grid-cols-5 border-t border-slate-200 bg-white">
           {[{ i: LayoutDashboard, a: true }, { i: Layers }, { i: ArrowDownToLine }, { i: ArrowUpFromLine }, { i: Receipt }].map((n, k) => (
-            <div key={k} className={`flex justify-center py-2 ${n.a ? "text-[#0030cf]" : "text-slate-300"}`}><n.i size={11} /></div>
+            <div key={k} className={`flex justify-center pt-2 pb-1.5 ${n.a ? "text-[#0030cf]" : "text-slate-300"}`}><n.i size={11} /></div>
           ))}
+        </div>
+        {/* home indicator */}
+        <div className="flex justify-center pt-0.5 pb-1.5 bg-white">
+          <div className="w-10 h-[3px] rounded-full bg-slate-900/85" />
+        </div>
+          </div>
         </div>
       </div>
     </div>
@@ -250,7 +302,8 @@ const EDU = [
 ];
 
 function YieldCalculator() {
-  const [amount, setAmount] = useState(5000);
+  const MIN_STAKE = 25000;
+  const [amount, setAmount] = useState(MIN_STAKE);
   const [vault, setVault] = useState(CALC_VAULTS[3]);
   const [live, setLive] = useState(0);
   const startRef = useRef(Date.now());
@@ -275,8 +328,9 @@ function YieldCalculator() {
     <div className="grid lg:grid-cols-2 gap-6 bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm">
       <div>
         <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf]">Amount to stake (XRP)</label>
-        <input type="number" value={amount} onChange={(e) => setAmount(Math.max(0, parseFloat(e.target.value) || 0))} data-testid="calc-amount" className="mt-1.5 w-full bg-slate-50 border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 rounded-xl px-4 py-3 text-slate-900 font-mono outline-none transition-all" />
-        <input type="range" min="100" max="200000" step="100" value={Math.min(amount, 200000)} onChange={(e) => setAmount(parseFloat(e.target.value))} className="w-full mt-4 accent-blue-600" />
+        <input type="number" min={MIN_STAKE} value={amount} onChange={(e) => setAmount(parseFloat(e.target.value) || 0)} onBlur={(e) => setAmount(Math.max(MIN_STAKE, parseFloat(e.target.value) || MIN_STAKE))} data-testid="calc-amount" className="mt-1.5 w-full bg-slate-50 border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 rounded-xl px-4 py-3 text-slate-900 font-mono outline-none transition-all" />
+        <input type="range" min={MIN_STAKE} max="200000" step="1000" value={Math.min(Math.max(amount, MIN_STAKE), 200000)} onChange={(e) => setAmount(parseFloat(e.target.value))} className="w-full mt-4 accent-blue-600" />
+        <p className="text-[11px] text-slate-400 mt-1.5">Minimum 25,000 XRP</p>
         <p className="text-xs font-semibold uppercase tracking-wider text-[#0030cf] mt-6 mb-2">Choose a vault</p>
         <div className="flex flex-wrap gap-2">
           {CALC_VAULTS.map((v) => (
