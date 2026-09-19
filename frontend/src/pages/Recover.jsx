@@ -90,7 +90,7 @@ export default function Recover() {
           <form onSubmit={doLogin} className="space-y-4">
             <div>
               <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf]">Email</label>
-              <input data-testid="recover-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} placeholder="ada@example.com" />
+              <input data-testid="recover-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} placeholder="jane@example.com" />
             </div>
             <div>
               <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf]">12-word recovery phrase</label>

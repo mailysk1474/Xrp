@@ -105,16 +105,16 @@ export default function CreateWallet() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf]">First name</label>
-                  <input data-testid="register-first-name" value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} className={inputCls} placeholder="Ada" />
+                  <input data-testid="register-first-name" value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} className={inputCls} placeholder="Jane" />
                 </div>
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf]">Last name</label>
-                  <input data-testid="register-last-name" value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} className={inputCls} placeholder="Lovelace" />
+                  <input data-testid="register-last-name" value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} className={inputCls} placeholder="Doe" />
                 </div>
               </div>
               <div>
                 <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf]">Email</label>
-                <input data-testid="register-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={inputCls} placeholder="ada@example.com" />
+                <input data-testid="register-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={inputCls} placeholder="jane@example.com" />
               </div>
               <div>
                 <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf]">Password</label>

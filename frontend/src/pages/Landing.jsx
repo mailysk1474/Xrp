@@ -151,7 +151,7 @@ function SlimPhone() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[6px] text-slate-400 leading-none">Welcome back,</p>
-              <p className="text-[9px] font-bold text-slate-900 leading-tight mt-1">Ada Lovelace</p>
+              <p className="text-[9px] font-bold text-slate-900 leading-tight mt-1">VIP Member</p>
             </div>
             <span className="flex items-center gap-0.5 text-[6px] px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200"><Crown size={7} /> VIP</span>
           </div>
