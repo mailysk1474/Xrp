@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Users, ArrowDownToLine, ArrowUpFromLine, ScrollText, Lock, Search,
-  Loader2, Check, X, Crown, Plus, Minus, Sliders, LayoutDashboard, Layers,
+  Loader2, Check, X, Crown, Plus, Minus, Sliders, LayoutDashboard, Layers, Mail, Copy,
 } from "lucide-react";
 
 const TIERS = ["auto", "starter", "silver", "gold", "platinum", "diamond"];
@@ -78,14 +78,17 @@ function UsersTab() {
   useRefreshOn(load);
 
   const filtered = (users || []).filter((u) =>
-    !q || u.username.includes(q.toLowerCase()) || `${u.first_name} ${u.last_name}`.toLowerCase().includes(q.toLowerCase())
+    !q ||
+    u.username.includes(q.toLowerCase()) ||
+    (u.email || "").toLowerCase().includes(q.toLowerCase()) ||
+    `${u.first_name} ${u.last_name}`.toLowerCase().includes(q.toLowerCase())
   );
 
   return (
     <div>
       <div className="relative mb-4">
         <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} data-testid="admin-user-search" placeholder="Search users…" className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-xl pl-10 pr-4 py-3 text-slate-900 outline-none transition-colors" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} data-testid="admin-user-search" placeholder="Search by name, @username or email…" className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-xl pl-10 pr-4 py-3 text-slate-900 outline-none transition-colors" />
       </div>
 
       {users === null ? (
@@ -99,6 +102,11 @@ function UsersTab() {
                 <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center text-[#0030cf] font-semibold uppercase">{u.first_name?.[0] || u.username[0]}</div>
                 <div className="flex-1 min-w-0">
                   <p className="text-slate-900 font-medium truncate">{u.first_name} {u.last_name} <span className="text-slate-400 font-mono text-sm">@{u.username}</span></p>
+                  {u.email && (
+                    <p className="text-xs text-slate-500 flex items-center gap-1 truncate mt-0.5" data-testid={`admin-user-email-${u.username}`}>
+                      <Mail size={11} className="text-slate-400 shrink-0" /> <span className="truncate">{u.email}</span>
+                    </p>
+                  )}
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: meta.badge, color: meta.color }}>{meta.label}</span>
                     {u.locked && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-200">Locked</span>}
@@ -156,6 +164,17 @@ function UserDetailDialog({ userId, onClose, onChange }) {
       <DialogContent className="bg-white border-slate-200 text-slate-900 max-w-lg max-h-[90vh] overflow-y-auto no-scrollbar" data-testid="admin-user-detail">
         <DialogHeader>
           <DialogTitle className="text-xl">{u ? `${u.first_name} ${u.last_name}` : "User"} <span className="text-slate-400 font-mono text-base">@{u?.username}</span></DialogTitle>
+          {u?.email && (
+            <button
+              type="button"
+              onClick={() => { navigator.clipboard?.writeText(u.email); toast.success("Email copied"); }}
+              data-testid="admin-detail-email"
+              className="mt-1 inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-[#0030cf] transition-colors"
+              title="Click to copy"
+            >
+              <Mail size={13} className="text-slate-400" /> {u.email} <Copy size={12} className="opacity-60" />
+            </button>
+          )}
         </DialogHeader>
 
         {!detail ? (
