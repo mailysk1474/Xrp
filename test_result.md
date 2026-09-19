@@ -136,6 +136,22 @@ backend:
         -agent: "testing"
         -comment: "✅ VERIFIED: GET /api/price/xrp returns HTTP 200 with correct JSON structure {usd: 1.4299, source: 'coinbase', cached: true, updated_at: timestamp}. USD value is positive and in expected range. Source is valid (coinbase/kraken). Caching mechanism works correctly - subsequent calls within 60s return cached=true with same USD value. All requirements met."
 
+backend:
+  - task: "Early-exit (stop stake) endpoint"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "New POST /api/stakes/{stake_id}/exit. Only locked+unmatured stakes owned by the user. Computes returned = principal*(1 - early_exit_fee - slippage) using LIVE vault terms; forfeits accrued profit; sets stake principal 0 / status exited; credits balance; logs 'early_exit' transaction with breakdown. Vault docs now carry early_exit_fee (0.10) and slippage (0.02); serialize_stake exposes can_exit + fee/slippage amounts + early_exit_return. Admin PUT /api/admin/vaults/{key} now accepts early_exit_fee & slippage."
+        -working: true
+        -agent: "testing"
+        -comment: "✅ VERIFIED: Complete early-exit flow tested successfully. (1) User registration and admin balance credit working correctly. (2) Staking into locked vault vip_silver (150000 XRP) successful. (3) GET /api/state correctly returns can_exit=true, early_exit_fee=0.10, slippage=0.02, early_exit_fee_amount=15000, early_exit_slippage_amount=3000, early_exit_return=132000, status=active. (4) POST /api/stakes/{stake_id}/exit returns correct values: returned=132000, fee_amount=15000, slippage_amount=3000, principal=150000. (5) Post-exit state verified: stake principal=0, status=exited, total_staked reduced to 0, balance increased by exactly 132000 (from 50000 to 182000). (6) Transaction history includes early_exit transaction with correct amount (132000) and meta breakdown (fee_amount=15000, slippage_amount=3000, forfeited_profit present). (7) Negative tests passed: exiting same stake again returns 400, exiting flexible stake returns 400, exiting non-existent stake returns 404. (8) Admin vault terms update verified: PUT /api/admin/vaults/vip_silver with early_exit_fee=0.15 and slippage=0.03 correctly updates calculations (fee_amount=22500, slippage_amount=4500, return=123000), then successfully reset to original values. All 8 test steps passed with correct calculations and error handling."
+
 frontend:
   - task: "USD values shown next to XRP across app"
     implemented: true
@@ -148,11 +164,22 @@ frontend:
         -working: "NA"
         -agent: "main"
         -comment: "Added PriceProvider (polls /api/price/xrp every 60s) + fmtUSD/xrpToUsdLabel helpers. USD secondary lines added to VaultsPage, Dashboard, Deposit, Withdraw, History, and a live XRP price badge in AppShell header. Not yet UI-tested."
+  - task: "Stop stake early UI + admin vault terms"
+    implemented: true
+    working: "NA"
+    file: "frontend/src/pages/Dashboard.jsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Dashboard: 'Stop stake early' button on locked/unmatured stakes -> ExitStakeDialog showing principal, fee, slippage, forfeited profit, net received (with USD). History: 'Early exit' txn type. Admin: new Vaults tab to edit each vault's early exit fee % and slippage %. Not yet UI-tested."
 
 metadata:
   created_by: "main_agent"
-  version: "1.1"
-  test_sequence: 1
+  version: "1.3"
+  test_sequence: 2
   run_ui: false
 
 test_plan:
@@ -163,6 +190,8 @@ test_plan:
 
 agent_communication:
     -agent: "main"
-    -message: "Please test backend only: (1) GET /api/price/xrp returns a positive usd number with source coinbase/kraken and caches on the 2nd call; (2) GET /api/vaults returns the new minimums (xrp_flex 50000, vip_silver 150000, vip_gold 350000, vip_platinum 750000, vip_diamond 2000000); (3) POST /api/stakes rejects an amount below the vault min with 400. Admin creds are in /app/memory/test_credentials.md."
+    -message: "Please test the NEW early-exit backend flow only. Admin creds in /app/memory/test_credentials.md (username admin, phrase 'legal winner thank year wave sausage worth useful legal winner thank yellow'). Steps: (1) create/register a normal test user via POST /api/auth/register (returns token+phrase). (2) As admin, credit that user's balance via POST /api/admin/users/{user_id}/adjust-balance (find user_id via GET /api/admin/users). (3) As the user, stake into a LOCKED vault e.g. vip_silver amount 150000 via POST /api/stakes. (4) GET /api/state and confirm the stake has can_exit=true, early_exit_fee=0.10, slippage=0.02, early_exit_fee_amount=15000, early_exit_slippage_amount=3000, early_exit_return=132000. (5) POST /api/stakes/{stake_id}/exit and confirm response returned=132000, fee_amount=15000, slippage_amount=3000; then GET /api/state shows the stake gone from active (principal 0/status exited), balance increased by 132000, and a 'early_exit' transaction in GET /api/transactions. (6) Confirm exiting a FLEX (unlocked) stake or an already-exited stake returns 400. Also verify admin PUT /api/admin/vaults/vip_silver with {early_exit_fee:0.15, slippage:0.03} persists and changes the quoted amounts (then set it back to 0.10/0.02)."
     -agent: "testing"
     -message: "✅ Backend testing complete. All 3 tests PASSED: (1) GET /api/price/xrp returns positive USD value (1.4299), correct source (coinbase), and caching works correctly. (2) GET /api/vaults returns all 5 vaults with exact min_amount values matching new ladder. (3) POST /api/stakes correctly validates min-amount and returns 400 'Minimum for this vault is 150000 XRP.' before balance check. Both backend tasks marked as working=true. No issues found."
+    -agent: "testing"
+    -message: "✅ Early-exit backend flow testing complete. ALL 8 TEST STEPS PASSED with no issues. Comprehensive testing covered: user registration, admin balance credit, locked vault staking, early-exit field calculations, exit execution, post-exit state verification, transaction logging, negative test cases (re-exit, flex vault exit, non-existent stake), and admin vault terms updates. All calculations are mathematically correct (150000 principal → 15000 fee + 3000 slippage = 132000 returned). Error handling works correctly for all edge cases. The early-exit feature is fully functional and ready for production use."

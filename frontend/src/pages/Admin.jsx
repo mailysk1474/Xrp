@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Users, ArrowDownToLine, ArrowUpFromLine, ScrollText, Lock, Search,
-  Loader2, Check, X, Crown, Plus, Minus, Sliders, LayoutDashboard,
+  Loader2, Check, X, Crown, Plus, Minus, Sliders, LayoutDashboard, Layers,
 } from "lucide-react";
 
 const TIERS = ["auto", "starter", "silver", "gold", "platinum", "diamond"];
@@ -44,11 +44,13 @@ export default function Admin() {
             <TabsTrigger value="users" data-testid="admin-tab-users" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg text-slate-600"><Users size={15} className="mr-1.5" /> Users</TabsTrigger>
             <TabsTrigger value="deposits" data-testid="admin-tab-deposits" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg text-slate-600"><ArrowDownToLine size={15} className="mr-1.5" /> Deposits</TabsTrigger>
             <TabsTrigger value="withdrawals" data-testid="admin-tab-withdrawals" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg text-slate-600"><ArrowUpFromLine size={15} className="mr-1.5" /> Withdrawals</TabsTrigger>
+            <TabsTrigger value="vaults" data-testid="admin-tab-vaults" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg text-slate-600"><Layers size={15} className="mr-1.5" /> Vaults</TabsTrigger>
             <TabsTrigger value="audit" data-testid="admin-tab-audit" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg text-slate-600"><ScrollText size={15} className="mr-1.5" /> Audit</TabsTrigger>
           </TabsList>
           <TabsContent value="users" className="mt-5"><UsersTab /></TabsContent>
           <TabsContent value="deposits" className="mt-5"><DepositsTab /></TabsContent>
           <TabsContent value="withdrawals" className="mt-5"><WithdrawalsTab /></TabsContent>
+          <TabsContent value="vaults" className="mt-5"><VaultsTab /></TabsContent>
           <TabsContent value="audit" className="mt-5"><AuditTab /></TabsContent>
         </Tabs>
       </main>
@@ -291,6 +293,89 @@ function AuditTab() {
           <span className="ml-auto text-xs text-slate-400">{fmtDate(l.created_at)}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+
+function VaultsTab() {
+  const [vaults, setVaults] = useState(null);
+  const [edits, setEdits] = useState({});
+  const [savingKey, setSavingKey] = useState(null);
+
+  const load = useCallback(() => {
+    api.get("/vaults").then(({ data }) => {
+      setVaults(data.vaults);
+      const init = {};
+      data.vaults.forEach((v) => {
+        init[v.key] = {
+          fee: ((v.early_exit_fee ?? 0.10) * 100).toString(),
+          slip: ((v.slippage ?? 0.02) * 100).toString(),
+        };
+      });
+      setEdits(init);
+    }).catch((e) => { setVaults([]); toast.error(apiError(e)); });
+  }, []);
+  useRefreshOn(load);
+
+  const setField = (key, field, val) => {
+    setEdits((prev) => ({ ...prev, [key]: { ...prev[key], [field]: val } }));
+  };
+
+  const save = async (key) => {
+    const e = edits[key] || {};
+    const fee = parseFloat(e.fee);
+    const slip = parseFloat(e.slip);
+    if (isNaN(fee) || fee < 0 || fee > 100) return toast.error("Early exit fee must be 0–100%.");
+    if (isNaN(slip) || slip < 0 || slip > 100) return toast.error("Slippage must be 0–100%.");
+    if (fee + slip > 100) return toast.error("Fee + slippage can't exceed 100%.");
+    setSavingKey(key);
+    try {
+      await api.put(`/admin/vaults/${key}`, { early_exit_fee: fee / 100, slippage: slip / 100 });
+      toast.success("Vault terms updated.");
+      load();
+    } catch (err) {
+      toast.error(apiError(err));
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  if (vaults === null) return <div className="flex justify-center py-16"><Loader2 className="animate-spin text-[#0030cf]" /></div>;
+
+  return (
+    <div className="space-y-3" data-testid="admin-vaults-list">
+      <p className="text-sm text-slate-500">Set the early exit fee and slippage applied when a member stops a locked stake before maturity. Changes apply to all active stakes in that vault.</p>
+      {vaults.map((v) => {
+        const meta = TIER_META[v.tier] || TIER_META.flex;
+        const e = edits[v.key] || { fee: "", slip: "" };
+        return (
+          <div key={v.key} className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm" data-testid={`admin-vault-${v.key}`}>
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-3">
+                <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: meta.color }} />
+                <div>
+                  <p className="font-semibold text-slate-900">{v.name}</p>
+                  <p className="text-xs text-slate-400 font-mono">{(v.apy * 100).toFixed(1)}% APY · {v.duration_days ? `${v.duration_days}d lock` : "Flexible"} · Min {fmtXRP(v.min_amount, 0)} XRP</p>
+                </div>
+              </div>
+              <div className="flex items-end gap-3 flex-wrap">
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-1">Early exit fee %</label>
+                  <input type="number" step="0.1" value={e.fee} onChange={(ev) => setField(v.key, "fee", ev.target.value)} data-testid={`vault-fee-${v.key}`} className="w-24 bg-slate-50 border border-slate-300 focus:border-blue-500 rounded-lg px-3 py-2 font-mono text-sm outline-none" />
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-1">Slippage %</label>
+                  <input type="number" step="0.1" value={e.slip} onChange={(ev) => setField(v.key, "slip", ev.target.value)} data-testid={`vault-slip-${v.key}`} className="w-24 bg-slate-50 border border-slate-300 focus:border-blue-500 rounded-lg px-3 py-2 font-mono text-sm outline-none" />
+                </div>
+                <button onClick={() => save(v.key)} disabled={savingKey === v.key} data-testid={`vault-save-${v.key}`} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+                  {savingKey === v.key ? <Loader2 className="animate-spin" size={15} /> : <Check size={15} />} Save
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

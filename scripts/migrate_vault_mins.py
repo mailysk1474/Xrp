@@ -18,7 +18,10 @@ async def main():
     client = AsyncIOMotorClient(os.environ["MONGO_URL"])
     db = client[os.environ["DB_NAME"]]
     for key, mn in NEW_MINS.items():
-        res = await db.vaults.update_one({"key": key}, {"$set": {"min_amount": mn}})
+        res = await db.vaults.update_one(
+            {"key": key},
+            {"$set": {"min_amount": mn, "early_exit_fee": 0.10, "slippage": 0.02}},
+        )
         print(f"{key}: matched={res.matched_count} modified={res.modified_count} -> {mn}")
     rows = await db.vaults.find({}, {"_id": 0, "key": 1, "min_amount": 1}).to_list(100)
     print("Current DB vault minimums:", rows)

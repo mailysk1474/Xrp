@@ -12,7 +12,7 @@ import { motion } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   TrendingUp, Layers, ArrowDownToLine, ArrowUpFromLine,
-  Lock, Crown, Sparkles, Clock, Repeat, Loader2,
+  Lock, Crown, Sparkles, Clock, Repeat, Loader2, LogOut, AlertTriangle,
 } from "lucide-react";
 
 function ReinvestDialog({ open, onClose, profit, onDone }) {
@@ -82,6 +82,71 @@ function ReinvestDialog({ open, onClose, profit, onDone }) {
   );
 }
 
+function ExitStakeDialog({ stake, onClose, onDone }) {
+  const [busy, setBusy] = useState(false);
+  const { rate } = usePrice();
+  const open = !!stake;
+
+  const confirm = async () => {
+    if (!stake) return;
+    setBusy(true);
+    try {
+      const { data } = await api.post(`/stakes/${stake.id}/exit`);
+      toast.success(`Stake stopped. ${fmtXRP(data.returned)} XRP credited to your balance.`);
+      onDone();
+      onClose();
+    } catch (err) {
+      toast.error(apiError(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const feePct = stake ? (stake.early_exit_fee * 100).toFixed(1) : "0";
+  const slipPct = stake ? (stake.slippage * 100).toFixed(1) : "0";
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="bg-white border-slate-200 text-slate-900 max-w-md" data-testid="exit-stake-dialog">
+        <DialogHeader><DialogTitle className="text-xl">Stop this stake early?</DialogTitle></DialogHeader>
+        {stake && (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 rounded-xl bg-amber-50 border border-amber-200 p-3.5">
+              <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={17} />
+              <p className="text-xs text-amber-700">Stopping before the lock ends forfeits your accrued profit and applies an early exit fee and slippage. This can't be undone.</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 divide-y divide-slate-100" data-testid="exit-breakdown">
+              <Row label="Principal" value={`${fmtXRP(stake.principal)} XRP`} sub={rate ? xrpToUsdLabel(stake.principal, rate, 0) : null} />
+              <Row label={`Early exit fee (${feePct}%)`} value={`− ${fmtXRP(stake.early_exit_fee_amount)} XRP`} negative sub={rate ? xrpToUsdLabel(stake.early_exit_fee_amount, rate, 0) : null} />
+              <Row label={`Slippage (${slipPct}%)`} value={`− ${fmtXRP(stake.early_exit_slippage_amount)} XRP`} negative sub={rate ? xrpToUsdLabel(stake.early_exit_slippage_amount, rate, 0) : null} />
+              <Row label="Forfeited profit" value={`− ${fmtXRP(stake.accrued)} XRP`} negative sub={rate ? xrpToUsdLabel(stake.accrued, rate, 2) : null} />
+              <Row label="You receive" value={`${fmtXRP(stake.early_exit_return)} XRP`} strong sub={rate ? xrpToUsdLabel(stake.early_exit_return, rate, 2) : null} />
+            </div>
+            <div className="flex gap-3">
+              <button onClick={onClose} data-testid="exit-cancel-button" className="flex-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold py-3 rounded-xl transition-colors">Keep staking</button>
+              <button onClick={confirm} disabled={busy} data-testid="confirm-exit-button" className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition-all">
+                {busy ? <Loader2 className="animate-spin" size={18} /> : <><LogOut size={16} /> Stop stake</>}
+              </button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function Row({ label, value, sub, negative, strong }) {
+  return (
+    <div className="flex items-center justify-between px-4 py-2.5">
+      <span className="text-sm text-slate-500">{label}</span>
+      <span className="text-right">
+        <span className={`font-mono text-sm ${strong ? "font-bold text-slate-900" : negative ? "text-red-600 font-medium" : "font-semibold text-slate-900"}`}>{value}</span>
+        {sub ? <span className="block text-[11px] text-slate-400 font-mono">{sub}</span> : null}
+      </span>
+    </div>
+  );
+}
+
 function StatCard({ icon: Icon, label, children, accent = "#0030cf", testid, delay = 0 }) {
   return (
     <motion.div
@@ -104,6 +169,7 @@ export default function Dashboard() {
   const { rate } = usePrice();
   const navigate = useNavigate();
   const [reinvestOpen, setReinvestOpen] = useState(false);
+  const [exitStake, setExitStake] = useState(null);
 
   useEffect(() => {
     ensureNotifyPermission();
@@ -257,6 +323,11 @@ export default function Dashboard() {
                       <Countdown target={st.matures_at} offsetRef={serverOffset} className="font-mono text-sm font-semibold text-[#0030cf] tabular-nums" testid={`countdown-${st.id}`} />
                     </div>
                   )}
+                  {st.can_exit && !s.user.locked && (
+                    <button onClick={() => setExitStake(st)} data-testid={`stop-stake-${st.id}`} className="w-full mt-3 flex items-center justify-center gap-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg py-2 transition-colors">
+                      <LogOut size={13} /> Stop stake early
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -265,6 +336,7 @@ export default function Dashboard() {
       </div>
 
       <ReinvestDialog open={reinvestOpen} onClose={() => setReinvestOpen(false)} profit={s.profit} onDone={refresh} />
+      <ExitStakeDialog stake={exitStake} onClose={() => setExitStake(null)} onDone={refresh} />
     </div>
   );
 }
