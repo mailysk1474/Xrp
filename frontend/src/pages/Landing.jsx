@@ -279,11 +279,11 @@ function PhoneMock() {
 }
 
 const CALC_VAULTS = [
-  { key: "xrp_flex", name: "XRP Flex", apy: 0.052 },
-  { key: "vip_silver", name: "VIP Silver", apy: 0.192 },
-  { key: "vip_gold", name: "VIP Gold", apy: 0.384 },
-  { key: "vip_platinum", name: "VIP Platinum", apy: 0.836 },
-  { key: "vip_diamond", name: "VIP Diamond", apy: 1.56 },
+  { key: "xrp_flex", name: "XRP Flex", apy: 0.052, days: 0 },
+  { key: "vip_silver", name: "VIP Silver", apy: 0.192, days: 30 },
+  { key: "vip_gold", name: "VIP Gold", apy: 0.384, days: 45 },
+  { key: "vip_platinum", name: "VIP Platinum", apy: 0.836, days: 60 },
+  { key: "vip_diamond", name: "VIP Diamond", apy: 1.56, days: 90 },
 ];
 
 const TIERS_TABLE = [
@@ -309,6 +309,10 @@ function YieldCalculator() {
   const startRef = useRef(Date.now());
   const perYear = amount * vault.apy;
   const perSecond = perYear / (365 * 24 * 3600);
+  // Projected profit over the vault's lock term (flexible vaults project 1 year).
+  const termDays = vault.days > 0 ? vault.days : 365;
+  const termProfit = perYear * (termDays / 365);
+  const totalAtMaturity = amount + termProfit;
 
   useEffect(() => { startRef.current = Date.now(); setLive(0); }, [amount, vault]);
   useEffect(() => {
@@ -340,14 +344,27 @@ function YieldCalculator() {
       </div>
       <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl p-6 text-white flex flex-col justify-between">
         <div>
-          <p className="text-xs text-blue-100 uppercase tracking-wider">Live projected earnings</p>
-          <p className="font-mono text-3xl sm:text-4xl font-bold mt-1 tabular-nums" data-testid="calc-live">{money(live, 6)}</p>
-          <p className="text-xs text-blue-200">XRP since you opened this page</p>
+          <p className="text-xs text-blue-100 uppercase tracking-wider">
+            Projected profit {vault.days > 0 ? `· ${vault.days}-day lock` : "· per year (flexible)"}
+          </p>
+          <p className="font-mono text-3xl sm:text-4xl font-bold mt-1 tabular-nums" data-testid="calc-projected">
+            {money(termProfit, 2)} <span className="text-lg text-blue-200">XRP</span>
+          </p>
+          <p className="text-xs text-blue-200 mt-1">
+            on {money(amount, 0)} XRP staked at {(vault.apy * 100).toFixed(1)}% APY
+          </p>
+          <p className="text-sm text-white/90 mt-2">
+            Total at maturity ≈ <span className="font-mono font-bold" data-testid="calc-total">{money(totalAtMaturity, 2)} XRP</span>
+          </p>
+          <p className="text-[11px] text-blue-200 mt-3 flex items-center gap-1.5">
+            <TrendingUp size={12} className="text-emerald-300" />
+            <span className="font-mono" data-testid="calc-live">+{money(live, 6)}</span> accruing live since you opened this page
+          </p>
         </div>
         <div className="grid grid-cols-3 gap-3 mt-6">
-          <div className="bg-white/10 border border-white/20 rounded-xl p-3"><p className="text-[10px] text-blue-100 uppercase">Daily</p><p className="font-mono font-bold">{money(perYear / 365)}</p></div>
-          <div className="bg-white/10 border border-white/20 rounded-xl p-3"><p className="text-[10px] text-blue-100 uppercase">Monthly</p><p className="font-mono font-bold">{money(perYear / 12)}</p></div>
-          <div className="bg-white/10 border border-white/20 rounded-xl p-3"><p className="text-[10px] text-blue-100 uppercase">Yearly</p><p className="font-mono font-bold">{money(perYear)}</p></div>
+          <div className="bg-white/10 border border-white/20 rounded-xl p-3"><p className="text-[10px] text-blue-100 uppercase">Daily</p><p className="font-mono font-bold" data-testid="calc-daily">{money(perYear / 365)}</p></div>
+          <div className="bg-white/10 border border-white/20 rounded-xl p-3"><p className="text-[10px] text-blue-100 uppercase">Monthly</p><p className="font-mono font-bold" data-testid="calc-monthly">{money(perYear / 12)}</p></div>
+          <div className="bg-white/10 border border-white/20 rounded-xl p-3"><p className="text-[10px] text-blue-100 uppercase">Yearly</p><p className="font-mono font-bold" data-testid="calc-yearly">{money(perYear)}</p></div>
         </div>
         <p className="text-[11px] text-blue-200 mt-4">Illustrative only. Yields depend on vault terms and are not guaranteed.</p>
       </div>

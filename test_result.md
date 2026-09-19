@@ -180,6 +180,21 @@ backend:
         -comment: "✅ VERIFIED: All 11 test cases PASSED. (A) FLEX no-penalty exit: (1) User registered: flextest_c851a8b4@example.com, id=6aae9586f18d02487e166a54. (2) Admin credited 100000 XRP balance. (3) Staked 60000 XRP into xrp_flex. (4) GET /api/state verified: can_exit=true, exit_kind='flex', early_exit_fee=0, slippage=0, early_exit_fee_amount=0, early_exit_slippage_amount=0, early_exit_return=60000.000046 (principal + tiny profit). (5) POST /api/stakes/{id}/exit returned 60000.000098 (principal + profit), fee_amount=0, slippage_amount=0, principal=60000. (6) Post-exit state verified: stake principal=0, status='exited', balance increased to 100000.000098, transaction logged with type='early_exit', meta.kind='flex', forfeited_profit=0, profit_paid=0.000098. (B) LOCKED regression: (7) Staked 150000 XRP into vip_silver. (8) GET /api/state verified: exit_kind='locked', early_exit_fee=0.10, slippage=0.02, early_exit_fee_amount=15000, early_exit_slippage_amount=3000, early_exit_return=132000. (9) POST exit returned 132000, fee_amount=15000, slippage_amount=3000, principal=150000; transaction meta.kind='locked', forfeited_profit=0.000911. (C) Error cases: (10) Exiting already exited stake returned 400 'This stake is no longer active.' (11) Exiting non-existent stake returned 404 'Stake not found.' All assertions passed with correct calculations and error handling."
 
 frontend:
+  - task: "Yield calculator projected-profit fix (was showing near-zero live-since-page-open as the headline)"
+    implemented: true
+    working: "NA"
+    file: "frontend/src/pages/Landing.jsx"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: false
+        -agent: "user"
+        -comment: "User reported: 'See what you could earn' shows very little profit, unlike the percentage."
+        -working: "NA"
+        -agent: "main"
+        -comment: "ROOT CAUSE: the big headline number was `live` = perSecond * seconds-since-page-open, so it only accrued for a few seconds -> always a tiny fraction, contradicting the high APY. FIX: headline now shows PROJECTED PROFIT over the vault's lock term (flexible vaults project 1 year): termDays = vault.days>0?vault.days:365; termProfit = amount*apy*termDays/365. Also shows 'Total at maturity = amount + termProfit'. The live-since-page-open counter is demoted to a small secondary line. Daily/Monthly/Yearly cards unchanged (perYear/365, /12, perYear). New data-testids: calc-projected, calc-total, calc-live (now the small line), calc-daily, calc-monthly, calc-yearly. Calc vault lock days: flex 0(flexible), silver 30, gold 45, platinum 60, diamond 90. Default vault = VIP Platinum (apy 0.836), default amount 25000. Expected for defaults: Yearly=20,900.00; Projected profit(60d)=~3,435.62; Total=~28,435.62. Needs UI retest."
+
   - task: "User self-service backend: change-password, update-profile, notification prefs, transaction export (CSV/PDF)"
     implemented: true
     working: true
