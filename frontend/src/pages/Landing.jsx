@@ -278,12 +278,13 @@ function PhoneMock() {
   );
 }
 
+// `rate` = TOTAL profit paid at the END of the lock period (not annualized / daily / weekly).
 const CALC_VAULTS = [
-  { key: "xrp_flex", name: "XRP Flex", apy: 0.052, days: 0 },
-  { key: "vip_silver", name: "VIP Silver", apy: 0.192, days: 30 },
-  { key: "vip_gold", name: "VIP Gold", apy: 0.384, days: 45 },
-  { key: "vip_platinum", name: "VIP Platinum", apy: 0.836, days: 60 },
-  { key: "vip_diamond", name: "VIP Diamond", apy: 1.56, days: 90 },
+  { key: "xrp_flex", name: "XRP Flex", rate: 0.1999, days: 18 },
+  { key: "vip_silver", name: "VIP Silver", rate: 0.2999, days: 30 },
+  { key: "vip_gold", name: "VIP Gold", rate: 0.4999, days: 45 },
+  { key: "vip_platinum", name: "VIP Platinum", rate: 0.8999, days: 60 },
+  { key: "vip_diamond", name: "VIP Diamond", rate: 1.56, days: 90 },
 ];
 
 const TIERS_TABLE = [
@@ -307,12 +308,11 @@ function YieldCalculator() {
   const [vault, setVault] = useState(CALC_VAULTS[3]);
   const [live, setLive] = useState(0);
   const startRef = useRef(Date.now());
-  const perYear = amount * vault.apy;
-  const perSecond = perYear / (365 * 24 * 3600);
-  // Projected profit over the vault's lock term (flexible vaults project 1 year).
-  const termDays = vault.days > 0 ? vault.days : 365;
-  const termProfit = perYear * (termDays / 365);
+  // `rate` is the TOTAL return paid at maturity, so profit = amount * rate for the whole term.
+  const termProfit = amount * vault.rate;
   const totalAtMaturity = amount + termProfit;
+  // Live accrual is that total profit spread evenly across the full lock term.
+  const perSecond = termProfit / (vault.days * 24 * 3600);
 
   useEffect(() => { startRef.current = Date.now(); setLive(0); }, [amount, vault]);
   useEffect(() => {
@@ -338,20 +338,20 @@ function YieldCalculator() {
         <p className="text-xs font-semibold uppercase tracking-wider text-[#0030cf] mt-6 mb-2">Choose a vault</p>
         <div className="flex flex-wrap gap-2">
           {CALC_VAULTS.map((v) => (
-            <button key={v.key} onClick={() => setVault(v)} data-testid={`calc-vault-${v.key}`} className={`px-3.5 py-2 rounded-xl text-sm font-semibold border transition-all ${vault.key === v.key ? "bg-blue-600 text-white border-blue-600" : "bg-white text-slate-600 border-slate-200 hover:border-blue-300"}`}>{v.name} · {(v.apy * 100).toFixed(1)}%</button>
+            <button key={v.key} onClick={() => setVault(v)} data-testid={`calc-vault-${v.key}`} className={`px-3.5 py-2 rounded-xl text-sm font-semibold border transition-all ${vault.key === v.key ? "bg-blue-600 text-white border-blue-600" : "bg-white text-slate-600 border-slate-200 hover:border-blue-300"}`}>{v.name} · {(v.rate * 100).toFixed(2)}%</button>
           ))}
         </div>
       </div>
       <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl p-6 text-white flex flex-col justify-between">
         <div>
           <p className="text-xs text-blue-100 uppercase tracking-wider">
-            Projected profit {vault.days > 0 ? `· ${vault.days}-day lock` : "· per year (flexible)"}
+            Total profit at maturity · {vault.days}-day lock
           </p>
           <p className="font-mono text-3xl sm:text-4xl font-bold mt-1 tabular-nums" data-testid="calc-projected">
             {money(termProfit, 2)} <span className="text-lg text-blue-200">XRP</span>
           </p>
           <p className="text-xs text-blue-200 mt-1">
-            on {money(amount, 0)} XRP staked at {(vault.apy * 100).toFixed(1)}% APY
+            on {money(amount, 0)} XRP staked · {(vault.rate * 100).toFixed(2)}% total return over {vault.days} days
           </p>
           <p className="text-sm text-white/90 mt-2">
             Total at maturity ≈ <span className="font-mono font-bold" data-testid="calc-total">{money(totalAtMaturity, 2)} XRP</span>
@@ -362,11 +362,11 @@ function YieldCalculator() {
           </p>
         </div>
         <div className="grid grid-cols-3 gap-3 mt-6">
-          <div className="bg-white/10 border border-white/20 rounded-xl p-3"><p className="text-[10px] text-blue-100 uppercase">Daily</p><p className="font-mono font-bold" data-testid="calc-daily">{money(perYear / 365)}</p></div>
-          <div className="bg-white/10 border border-white/20 rounded-xl p-3"><p className="text-[10px] text-blue-100 uppercase">Monthly</p><p className="font-mono font-bold" data-testid="calc-monthly">{money(perYear / 12)}</p></div>
-          <div className="bg-white/10 border border-white/20 rounded-xl p-3"><p className="text-[10px] text-blue-100 uppercase">Yearly</p><p className="font-mono font-bold" data-testid="calc-yearly">{money(perYear)}</p></div>
+          <div className="bg-white/10 border border-white/20 rounded-xl p-3"><p className="text-[10px] text-blue-100 uppercase">Total return</p><p className="font-mono font-bold" data-testid="calc-rate">{(vault.rate * 100).toFixed(2)}%</p></div>
+          <div className="bg-white/10 border border-white/20 rounded-xl p-3"><p className="text-[10px] text-blue-100 uppercase">Lock period</p><p className="font-mono font-bold" data-testid="calc-lock">{vault.days}d</p></div>
+          <div className="bg-white/10 border border-white/20 rounded-xl p-3"><p className="text-[10px] text-blue-100 uppercase">Profit</p><p className="font-mono font-bold" data-testid="calc-profit">{money(termProfit, 0)}</p></div>
         </div>
-        <p className="text-[11px] text-blue-200 mt-4">Illustrative only. Yields depend on vault terms and are not guaranteed.</p>
+        <p className="text-[11px] text-blue-200 mt-4">Illustrative only. The percentage shown is the total profit paid at the end of the lock period — not a daily, weekly or annual rate.</p>
       </div>
     </div>
   );
@@ -499,7 +499,7 @@ export default function Landing() {
         <div className="max-w-2xl mb-10">
           <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#0030cf]">Yield calculator</p>
           <h2 className="text-3xl sm:text-4xl font-bold mt-3 text-slate-900">See what your XRP could earn.</h2>
-          <p className="text-slate-500 mt-4 leading-relaxed">Set an amount, pick a vault, and watch the projected yield update live — figures are illustrative, based on each vault&apos;s fixed APY.</p>
+          <p className="text-slate-500 mt-4 leading-relaxed">Set an amount, pick a vault, and see your total profit at the end of the lock period — the percentage shown is the full return paid at maturity, not a daily, weekly or annual rate.</p>
         </div>
         <YieldCalculator />
       </section>
