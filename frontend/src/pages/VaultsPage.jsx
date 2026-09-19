@@ -81,33 +81,31 @@ export default function VaultsPage() {
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wider text-slate-400 border-b border-slate-100">
                   <th className="py-2 pr-4 font-semibold">Vault</th>
-                  <th className="py-2 px-4 font-semibold">APY</th>
+                  <th className="py-2 px-4 font-semibold">Total return</th>
                   <th className="py-2 px-4 font-semibold">Lock</th>
                   <th className="py-2 px-4 font-semibold">Min stake</th>
-                  <th className="py-2 px-4 font-semibold">Yield at maturity</th>
-                  <th className="py-2 pl-4 font-semibold">Annualized</th>
+                  <th className="py-2 pl-4 font-semibold">Profit at maturity</th>
                 </tr>
               </thead>
               <tbody>
                 {vaults.map((v) => {
                   const meta = TIER_META[v.tier] || TIER_META.flex;
-                  const perYear = compareAmount * v.apy;
-                  const termYield = v.duration_days ? perYear * (v.duration_days / 365) : perYear;
+                  // `apy` is the TOTAL return paid at the end of the lock period.
+                  const termYield = compareAmount * v.apy;
                   return (
                     <tr key={v.key} className="border-b border-slate-50 last:border-0" data-testid={`compare-row-${v.key}`}>
                       <td className="py-3 pr-4 font-semibold text-slate-900"><span className="inline-block w-2 h-2 rounded-full mr-2 align-middle" style={{ background: meta.color }} />{v.name}</td>
-                      <td className="py-3 px-4 font-mono font-bold" style={{ color: meta.color }}>{(v.apy * 100).toFixed(1)}%</td>
+                      <td className="py-3 px-4 font-mono font-bold" style={{ color: meta.color }}>{(v.apy * 100).toFixed(2)}%</td>
                       <td className="py-3 px-4 text-slate-600">{v.duration_days ? `${v.duration_days} days` : "Flexible"}</td>
                       <td className="py-3 px-4 font-mono text-slate-600">{fmtXRP(v.min_amount, 0)}{rate ? <span className="block text-[11px] text-slate-400">{xrpToUsdLabel(v.min_amount, rate, 0)}</span> : null}</td>
-                      <td className="py-3 px-4 font-mono text-emerald-600">+{fmtXRP(termYield)}{rate ? <span className="block text-[11px] text-slate-400">{xrpToUsdLabel(termYield, rate, 0)}</span> : null}</td>
-                      <td className="py-3 pl-4 font-mono text-slate-600">+{fmtXRP(perYear)}{rate ? <span className="block text-[11px] text-slate-400">{xrpToUsdLabel(perYear, rate, 0)}</span> : null}</td>
+                      <td className="py-3 pl-4 font-mono text-emerald-600">+{fmtXRP(termYield)}{rate ? <span className="block text-[11px] text-slate-400">{xrpToUsdLabel(termYield, rate, 0)}</span> : null}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
-          <p className="text-xs text-slate-400 mt-3">Illustrative projections based on each vault&apos;s fixed APY. &ldquo;Yield at maturity&rdquo; reflects the lock term; flexible vaults show one year.</p>
+          <p className="text-xs text-slate-400 mt-3">Illustrative projections. Each vault&apos;s percentage is the total profit paid at the end of its lock period — &ldquo;Profit at maturity&rdquo; is that full return on your entered amount.</p>
         </motion.div>
       )}
 
@@ -125,8 +123,8 @@ export default function VaultsPage() {
                 </div>
                 <h3 className="text-lg font-semibold text-slate-900">{v.name}</h3>
                 <div className="flex items-baseline gap-1.5 mt-2">
-                  <span className="text-3xl font-bold font-mono tabular-nums" style={{ color: meta.color }}>{(v.apy * 100).toFixed(1)}%</span>
-                  <span className="text-xs text-slate-400 font-semibold">APY</span>
+                  <span className="text-3xl font-bold font-mono tabular-nums" style={{ color: meta.color }}>{(v.apy * 100).toFixed(2)}%</span>
+                  <span className="text-xs text-slate-400 font-semibold">total</span>
                 </div>
                 <p className="text-sm text-slate-500 mt-3 leading-relaxed">{v.description}</p>
               </div>
@@ -148,8 +146,8 @@ export default function VaultsPage() {
           {selected && (
             <div className="space-y-4">
               <div className="flex items-center justify-between text-sm bg-slate-50 rounded-xl px-4 py-3">
-                <span className="text-slate-500">APY</span>
-                <span className="font-mono font-bold" style={{ color: (TIER_META[selected.tier] || TIER_META.flex).color }}>{(selected.apy * 100).toFixed(1)}%</span>
+                <span className="text-slate-500">Total return</span>
+                <span className="font-mono font-bold" style={{ color: (TIER_META[selected.tier] || TIER_META.flex).color }}>{(selected.apy * 100).toFixed(2)}%</span>
               </div>
               <div className="flex items-center justify-between text-sm bg-slate-50 rounded-xl px-4 py-3">
                 <span className="text-slate-500">Term</span>

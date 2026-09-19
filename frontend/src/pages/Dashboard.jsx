@@ -64,7 +64,7 @@ function ReinvestDialog({ open, onClose, profit, onDone }) {
                 return (
                   <button key={v.key} disabled={!ok} onClick={() => setSelected(v)} data-testid={`reinvest-vault-${v.key}`}
                     className={`px-3 py-2 rounded-xl text-sm font-semibold border transition-all disabled:opacity-40 ${selected?.key === v.key ? "bg-blue-600 text-white border-blue-600" : "bg-white text-slate-600 border-slate-200 hover:border-blue-300"}`}>
-                    {v.name} · {(v.apy * 100).toFixed(1)}%
+                    {v.name} · {(v.apy * 100).toFixed(2)}%
                   </button>
                 );
               })}
@@ -402,7 +402,7 @@ export default function Dashboard() {
                       </div>
                       <div>
                         <p className="font-semibold text-slate-900">{st.vault_name}</p>
-                        <p className="text-xs text-slate-500 font-mono">{(st.apy * 100).toFixed(1)}% APY · {st.duration_days ? `${st.duration_days}d lock` : "Flexible"}</p>
+                        <p className="text-xs text-slate-500 font-mono">{(st.apy * 100).toFixed(2)}% total · {st.duration_days ? `${st.duration_days}d lock` : "Flexible"}</p>
                       </div>
                     </div>
                     {st.status === "matured" ? (

@@ -44,13 +44,13 @@ logging.basicConfig(level=logging.INFO)
 YEAR_SECONDS = 365 * 24 * 3600
 
 DEFAULT_VAULTS = [
-    {"key": "xrp_flex", "name": "XRP Flex", "apy": 0.052, "duration_days": 18, "tier": "flex",
+    {"key": "xrp_flex", "name": "XRP Flex", "apy": 0.1999, "duration_days": 18, "tier": "flex",
      "min_amount": 25000, "early_exit_fee": 0.10, "slippage": 0.02, "description": "18-day XRP vault. Auto-settles to your balance at maturity.", "enabled": True},
-    {"key": "vip_silver", "name": "VIP Silver", "apy": 0.192, "duration_days": 30, "tier": "silver",
+    {"key": "vip_silver", "name": "VIP Silver", "apy": 0.2999, "duration_days": 30, "tier": "silver",
      "min_amount": 50000, "early_exit_fee": 0.10, "slippage": 0.02, "description": "30-day locked VIP vault for Silver members and above.", "enabled": True},
-    {"key": "vip_gold", "name": "VIP Gold", "apy": 0.384, "duration_days": 45, "tier": "gold",
+    {"key": "vip_gold", "name": "VIP Gold", "apy": 0.4999, "duration_days": 45, "tier": "gold",
      "min_amount": 100000, "early_exit_fee": 0.10, "slippage": 0.02, "description": "45-day locked VIP vault. Elevated Gold yield.", "enabled": True},
-    {"key": "vip_platinum", "name": "VIP Platinum", "apy": 0.836, "duration_days": 60, "tier": "platinum",
+    {"key": "vip_platinum", "name": "VIP Platinum", "apy": 0.8999, "duration_days": 60, "tier": "platinum",
      "min_amount": 250000, "early_exit_fee": 0.10, "slippage": 0.02, "description": "60-day locked Platinum vault. Premium yield tier.", "enabled": True},
     {"key": "vip_diamond", "name": "VIP Diamond", "apy": 1.56, "duration_days": 90, "tier": "diamond",
      "min_amount": 500000, "early_exit_fee": 0.10, "slippage": 0.02, "description": "90-day locked Diamond vault. Maximum protocol yield.", "enabled": True},
@@ -260,14 +260,24 @@ def next_tier_progress(total_staked: float):
 
 
 def stake_accrued(stake: dict, now: datetime) -> float:
+    # `apy` is the TOTAL return earned over the full lock period (not annualized).
+    # Profit accrues live from 0 up to exactly principal * apy at maturity, based on the
+    # CURRENT principal — so it always reflects the real staked balance.
     start = parse_iso(stake["start_at"])
     elapsed = (now - start).total_seconds()
     if elapsed < 0:
         elapsed = 0
+    rate = stake.get("apy", 0) or 0
+    principal = stake.get("principal", 0) or 0
     dur = stake.get("duration_days", 0) or 0
     if dur > 0:
-        elapsed = min(elapsed, dur * 86400)
-    return stake["principal"] * stake["apy"] * (elapsed / YEAR_SECONDS)
+        period = dur * 86400
+        frac = elapsed / period
+        if frac > 1:
+            frac = 1.0
+        return principal * rate * frac
+    # No fixed term: fall back to a linear daily portion of the total rate.
+    return principal * rate * (elapsed / YEAR_SECONDS)
 
 
 def stake_matured(stake: dict, now: datetime) -> bool:
