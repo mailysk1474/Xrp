@@ -176,10 +176,25 @@ frontend:
         -agent: "main"
         -comment: "Dashboard: 'Stop stake early' button on locked/unmatured stakes -> ExitStakeDialog showing principal, fee, slippage, forfeited profit, net received (with USD). History: 'Early exit' txn type. Admin: new Vaults tab to edit each vault's early exit fee % and slippage %. Not yet UI-tested."
 
+  - task: "Email + password auth (signup/login/recover)"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Added email + bcrypt password_hash to users. POST /api/auth/register now takes {first_name,last_name,email,password} (min 8 chars, valid email, unique email), auto-generates a unique username from the email, still returns {token, phrase, user}. POST /api/auth/login now takes {email,password}. New POST /api/auth/recover takes {email,phrase} (phrase-based). public_user includes email. Seed adds unique sparse email index and syncs admin email/password from env (ADMIN_EMAIL=admin@xamanprotocol.com, ADMIN_PASSWORD=XamanAdmin2025!). Manually verified: admin login + recover work, register works with auto username. Needs full automated retest incl. duplicate-email 409, short-password 400, invalid email 400, wrong-password 401, wrong-phrase 401."
+        -working: true
+        -agent: "testing"
+        -comment: "✅ VERIFIED: All 10 test cases PASSED. (1) POST /api/auth/register with valid data returns 200 with token, 12-word phrase, and user object containing email and auto-generated username. (2) Duplicate email registration correctly returns 409 'An account with that email already exists.' (3) Short password (5 chars) correctly returns 400 'Password must be at least 8 characters.' (4) Invalid email 'abc' correctly returns 400 'Enter a valid email address.' (5) POST /api/auth/login with correct credentials returns 200 with token; wrong password returns 401 'Invalid email or password.' (6) Admin login with admin@xamanprotocol.com / XamanAdmin2025! returns 200 with user.role='admin'. (7) POST /api/auth/recover with correct phrase returns 200 with token; wrong phrase returns 401 'Invalid email or recovery phrase.' (8) Admin recover with admin phrase returns 200 with user.role='admin'. (9) GET /api/auth/me and GET /api/state both return 200 with correct user data (id, email, username all match). (10) Test user created: id=6aae88326ce4740f3ff6c337, email=authtest_89efccae@example.com. All validation, authentication, and authorization flows working correctly."
+
 metadata:
   created_by: "main_agent"
-  version: "1.3"
-  test_sequence: 2
+  version: "1.4"
+  test_sequence: 3
   run_ui: false
 
 test_plan:
@@ -190,8 +205,10 @@ test_plan:
 
 agent_communication:
     -agent: "main"
-    -message: "Please test the NEW early-exit backend flow only. Admin creds in /app/memory/test_credentials.md (username admin, phrase 'legal winner thank year wave sausage worth useful legal winner thank yellow'). Steps: (1) create/register a normal test user via POST /api/auth/register (returns token+phrase). (2) As admin, credit that user's balance via POST /api/admin/users/{user_id}/adjust-balance (find user_id via GET /api/admin/users). (3) As the user, stake into a LOCKED vault e.g. vip_silver amount 150000 via POST /api/stakes. (4) GET /api/state and confirm the stake has can_exit=true, early_exit_fee=0.10, slippage=0.02, early_exit_fee_amount=15000, early_exit_slippage_amount=3000, early_exit_return=132000. (5) POST /api/stakes/{stake_id}/exit and confirm response returned=132000, fee_amount=15000, slippage_amount=3000; then GET /api/state shows the stake gone from active (principal 0/status exited), balance increased by 132000, and a 'early_exit' transaction in GET /api/transactions. (6) Confirm exiting a FLEX (unlocked) stake or an already-exited stake returns 400. Also verify admin PUT /api/admin/vaults/vip_silver with {early_exit_fee:0.15, slippage:0.03} persists and changes the quoted amounts (then set it back to 0.10/0.02)."
+    -message: "Test the NEW email+password auth backend only. Admin creds in /app/memory/test_credentials.md (email admin@xamanprotocol.com / password XamanAdmin2025! ; phrase 'legal winner thank year wave sausage worth useful legal winner thank yellow'). Cases: (1) POST /api/auth/register {first_name,last_name,email,password>=8} -> 200 with token+phrase+user (user has email + auto username). (2) Register same email again -> 409. (3) Register with password length 5 -> 400. (4) Register with invalid email 'abc' -> 400. (5) POST /api/auth/login {email,password} for that user -> 200 token; wrong password -> 401. (6) Admin login via /api/auth/login {admin@xamanprotocol.com, XamanAdmin2025!} -> 200 with user.role admin. (7) POST /api/auth/recover {email, phrase-from-register} -> 200 token; wrong phrase -> 401. (8) Admin recover via /api/auth/recover {admin email, admin phrase} -> 200 role admin. (9) GET /api/auth/me and GET /api/state with the token work. Clean up any test users you create if feasible."
     -agent: "testing"
     -message: "✅ Backend testing complete. All 3 tests PASSED: (1) GET /api/price/xrp returns positive USD value (1.4299), correct source (coinbase), and caching works correctly. (2) GET /api/vaults returns all 5 vaults with exact min_amount values matching new ladder. (3) POST /api/stakes correctly validates min-amount and returns 400 'Minimum for this vault is 150000 XRP.' before balance check. Both backend tasks marked as working=true. No issues found."
     -agent: "testing"
     -message: "✅ Early-exit backend flow testing complete. ALL 8 TEST STEPS PASSED with no issues. Comprehensive testing covered: user registration, admin balance credit, locked vault staking, early-exit field calculations, exit execution, post-exit state verification, transaction logging, negative test cases (re-exit, flex vault exit, non-existent stake), and admin vault terms updates. All calculations are mathematically correct (150000 principal → 15000 fee + 3000 slippage = 132000 returned). Error handling works correctly for all edge cases. The early-exit feature is fully functional and ready for production use."
+    -agent: "testing"
+    -message: "✅ Email+password authentication backend testing complete. ALL 10 TEST CASES PASSED with no issues. Comprehensive testing covered: (1) User registration with email+password returns token, 12-word phrase, and user with email+auto-generated username. (2) Duplicate email correctly rejected with 409. (3) Short password (<8 chars) correctly rejected with 400. (4) Invalid email format correctly rejected with 400. (5) Login with correct/wrong password returns 200/401 respectively. (6) Admin login returns 200 with role='admin'. (7) Account recovery with correct/wrong phrase returns 200/401 respectively. (8) Admin recovery returns 200 with role='admin'. (9) Token authentication works correctly for GET /api/auth/me and GET /api/state. (10) Test user created for cleanup (id=6aae88326ce4740f3ff6c337). All validation rules, authentication flows, and authorization checks working correctly. No issues found."

@@ -15,8 +15,8 @@ export function getVault() {
   const raw = localStorage.getItem(VAULT_KEY);
   return raw ? JSON.parse(raw) : null;
 }
-export function setVault(username, enc) {
-  localStorage.setItem(VAULT_KEY, JSON.stringify({ username, enc }));
+export function setVault(username, enc, email) {
+  localStorage.setItem(VAULT_KEY, JSON.stringify({ username, enc, email }));
 }
 export function clearVault() {
   localStorage.removeItem(VAULT_KEY);

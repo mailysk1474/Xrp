@@ -5,6 +5,7 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 import os
+import re
 import jwt
 import bcrypt
 import time
@@ -96,6 +97,36 @@ def verify_phrase(phrase: str, hashed: str) -> bool:
         return bcrypt.checkpw(phrase.strip().lower().encode(), hashed.encode())
     except Exception:
         return False
+
+
+def hash_password(password: str) -> str:
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode(), salt).decode()
+
+
+def verify_password(password: str, hashed: str) -> bool:
+    try:
+        return bcrypt.checkpw(password.encode(), hashed.encode())
+    except Exception:
+        return False
+
+
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def valid_email(email: str) -> bool:
+    return bool(_EMAIL_RE.match(email.strip().lower()))
+
+
+async def unique_username_from_email(email: str) -> str:
+    base = re.sub(r"[^a-z0-9_]", "", email.split("@")[0].lower()) or "vip"
+    base = base[:20]
+    candidate = base
+    for _ in range(20):
+        if not await db.users.find_one({"username": candidate}):
+            return candidate
+        candidate = f"{base}_{secrets.randbelow(9000) + 1000}"
+    return f"{base}_{secrets.token_hex(4)}"
 
 
 def create_token(user_id: str, role: str) -> str:
@@ -284,6 +315,7 @@ def public_user(user: dict) -> dict:
         "first_name": user.get("first_name", ""),
         "last_name": user.get("last_name", ""),
         "username": user.get("username", ""),
+        "email": user.get("email", ""),
         "role": user.get("role", "user"),
         "locked": user.get("locked", False),
         "withdrawals_disabled": user.get("withdrawals_disabled", False),
@@ -376,11 +408,17 @@ class NoStoreMiddleware(BaseHTTPMiddleware):
 class RegisterReq(BaseModel):
     first_name: str
     last_name: str
-    username: str
+    email: str
+    password: str
 
 
 class LoginReq(BaseModel):
-    username: str
+    email: str
+    password: str
+
+
+class RecoverReq(BaseModel):
+    email: str
     phrase: str
 
 
@@ -424,21 +462,25 @@ class VaultUpdateReq(BaseModel):
 # ---------------------------------------------------------------------------
 @api.post("/auth/register")
 async def register(body: RegisterReq):
-    username = body.username.strip().lower()
-    if not username or len(username) < 3:
-        raise HTTPException(status_code=400, detail="Username must be at least 3 characters.")
+    email = body.email.strip().lower()
+    if not valid_email(email):
+        raise HTTPException(status_code=400, detail="Enter a valid email address.")
+    if len(body.password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
     if not body.first_name.strip() or not body.last_name.strip():
         raise HTTPException(status_code=400, detail="First and last name are required.")
-    existing = await db.users.find_one({"username": username})
-    if existing:
-        raise HTTPException(status_code=409, detail="That username is already taken.")
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(status_code=409, detail="An account with that email already exists.")
 
+    username = await unique_username_from_email(email)
     phrase = mnemo.generate(strength=128)
     tag = await unique_destination_tag()
     doc = {
         "first_name": body.first_name.strip(),
         "last_name": body.last_name.strip(),
         "username": username,
+        "email": email,
+        "password_hash": hash_password(body.password),
         "phrase_hash": hash_phrase(phrase),
         "role": "user",
         "balance": 0.0,
@@ -458,10 +500,20 @@ async def register(body: RegisterReq):
 
 @api.post("/auth/login")
 async def login(body: LoginReq):
-    username = body.username.strip().lower()
-    user = await db.users.find_one({"username": username})
+    email = body.email.strip().lower()
+    user = await db.users.find_one({"email": email})
+    if not user or not user.get("password_hash") or not verify_password(body.password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid email or password.")
+    token = create_token(str(user["_id"]), user.get("role", "user"))
+    return {"token": token, "user": public_user(user)}
+
+
+@api.post("/auth/recover")
+async def recover(body: RecoverReq):
+    email = body.email.strip().lower()
+    user = await db.users.find_one({"email": email})
     if not user or not verify_phrase(body.phrase, user["phrase_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid username or recovery phrase.")
+        raise HTTPException(status_code=401, detail="Invalid email or recovery phrase.")
     token = create_token(str(user["_id"]), user.get("role", "user"))
     return {"token": token, "user": public_user(user)}
 
@@ -950,23 +1002,32 @@ async def seed():
     for v in DEFAULT_VAULTS:
         await db.vaults.update_one({"key": v["key"]}, {"$setOnInsert": v}, upsert=True)
     await db.users.create_index("username", unique=True)
+    await db.users.create_index("email", unique=True, sparse=True)
     await db.users.create_index("destination_tag", unique=True, sparse=True)
 
     admin_username = os.environ["ADMIN_USERNAME"].strip().lower()
     admin_phrase = os.environ["ADMIN_PHRASE"].strip()
+    admin_email = os.environ.get("ADMIN_EMAIL", "admin@xamanprotocol.com").strip().lower()
+    admin_password = os.environ.get("ADMIN_PASSWORD", "admin12345").strip()
     existing = await db.users.find_one({"username": admin_username})
     if not existing:
         tag = await unique_destination_tag()
         await db.users.insert_one({
             "first_name": "Protocol", "last_name": "Admin", "username": admin_username,
+            "email": admin_email, "password_hash": hash_password(admin_password),
             "phrase_hash": hash_phrase(admin_phrase), "role": "admin", "balance": 0.0,
             "bonus_profit": 0.0, "locked": False, "withdrawals_disabled": False,
             "tier_override": None, "destination_tag": tag, "created_at": now_iso(),
         })
         logger.info("Seeded admin user '%s'", admin_username)
     else:
-        await db.users.update_one({"username": admin_username},
-                                  {"$set": {"role": "admin", "phrase_hash": hash_phrase(admin_phrase)}})
+        set_fields = {
+            "role": "admin",
+            "phrase_hash": hash_phrase(admin_phrase),
+            "email": admin_email,
+            "password_hash": hash_password(admin_password),
+        }
+        await db.users.update_one({"username": admin_username}, {"$set": set_fields})
 
 
 async def maturity_loop():

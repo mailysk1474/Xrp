@@ -9,9 +9,10 @@ import { encryptPhrase } from "@/lib/crypto";
 import { Loader2, RotateCcw } from "lucide-react";
 
 export default function Recover() {
-  const { login, setVault, beginSession, apiError } = useAuth();
+  const { recover, setVault, beginSession, apiError } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
+  const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [phrase, setPhrase] = useState("");
   const [loading, setLoading] = useState(false);
@@ -22,19 +23,21 @@ export default function Recover() {
   const doLogin = async (e) => {
     e.preventDefault();
     const cleaned = phrase.trim().replace(/\s+/g, " ").toLowerCase();
+    const emailOk = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim());
+    if (!emailOk) {
+      toast.error("Enter your account email.");
+      return;
+    }
     if (cleaned.split(" ").length !== 12) {
       toast.error("Recovery phrase must be exactly 12 words.");
       return;
     }
-    if (username.trim().length < 3) {
-      toast.error("Enter your username.");
-      return;
-    }
     setLoading(true);
     try {
-      const data = await login(username.trim().toLowerCase(), cleaned);
+      const data = await recover(email.trim().toLowerCase(), cleaned);
       setPhrase(cleaned);
       setUsername(data.user.username);
+      setEmail(data.user.email);
       if (data.user.role === "admin") {
         beginSession();
         toast.success("Welcome back, admin.");
@@ -63,7 +66,7 @@ export default function Recover() {
     setLoading(true);
     try {
       const enc = await encryptPhrase(phrase, pin);
-      setVault(username, enc);
+      setVault(username, enc, email);
       beginSession();
       toast.success("Wallet restored on this device.");
       navigate("/app");
@@ -82,12 +85,12 @@ export default function Recover() {
           <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center mb-5">
             <RotateCcw className="text-[#0030cf]" size={22} />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">Log in / Recover</h1>
-          <p className="text-sm text-slate-500 mt-2 mb-6">Enter your username and 12-word recovery phrase to access your wallet on this device.</p>
+          <h1 className="text-2xl font-bold text-slate-900">Recover with phrase</h1>
+          <p className="text-sm text-slate-500 mt-2 mb-6">Enter your account email and 12-word recovery phrase to restore your wallet on this device.</p>
           <form onSubmit={doLogin} className="space-y-4">
             <div>
-              <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf]">Username</label>
-              <input data-testid="recover-username" value={username} onChange={(e) => setUsername(e.target.value.replace(/\s/g, ""))} className={`${inputCls} font-mono`} placeholder="ada_vip" />
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf]">Email</label>
+              <input data-testid="recover-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} placeholder="ada@example.com" />
             </div>
             <div>
               <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf]">12-word recovery phrase</label>
@@ -98,8 +101,8 @@ export default function Recover() {
             </button>
           </form>
           <p className="text-center text-sm text-slate-500 mt-5">
-            No wallet yet?{" "}
-            <button onClick={() => navigate("/create")} data-testid="goto-create-link" className="text-[#0030cf] font-medium hover:underline">Create one</button>
+            Prefer password?{" "}
+            <button onClick={() => navigate("/login")} data-testid="goto-login-link" className="text-[#0030cf] font-medium hover:underline">Log in</button>
           </p>
         </motion.div>
       ) : (

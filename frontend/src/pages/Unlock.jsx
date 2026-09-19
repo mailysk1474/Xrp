@@ -9,7 +9,7 @@ import { decryptPhrase } from "@/lib/crypto";
 import { Fingerprint, Loader2 } from "lucide-react";
 
 export default function Unlock() {
-  const { getVault, hasVault, login, beginSession, logout, apiError } = useAuth();
+  const { getVault, hasVault, recover, beginSession, logout, apiError } = useAuth();
   const navigate = useNavigate();
   const [pin, setPin] = useState("");
   const [loading, setLoading] = useState(false);
@@ -23,11 +23,16 @@ export default function Unlock() {
   const unlock = async (value) => {
     const code = value || pin;
     if (code.length !== 4) return;
+    if (!vault?.email) {
+      toast.error("Please log in with your email and password.");
+      navigate("/login", { replace: true });
+      return;
+    }
     setLoading(true);
     setError("");
     try {
       const phrase = await decryptPhrase(vault.enc, code);
-      const data = await login(vault.username, phrase);
+      const data = await recover(vault.email, phrase);
       beginSession();
       toast.success("Wallet unlocked.");
       navigate(data.user.role === "admin" ? "/admin" : "/app", { replace: true });

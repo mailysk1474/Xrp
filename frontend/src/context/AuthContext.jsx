@@ -102,15 +102,22 @@ export function AuthProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const register = async ({ first_name, last_name, username }) => {
-    const { data } = await api.post("/auth/register", { first_name, last_name, username });
+  const register = async ({ first_name, last_name, email, password }) => {
+    const { data } = await api.post("/auth/register", { first_name, last_name, email, password });
     storage.setToken(data.token);
     setUser(data.user);
     return data; // includes phrase
   };
 
-  const login = async (username, phrase) => {
-    const { data } = await api.post("/auth/login", { username, phrase });
+  const login = async (email, password) => {
+    const { data } = await api.post("/auth/login", { email, password });
+    storage.setToken(data.token);
+    setUser(data.user);
+    return data;
+  };
+
+  const recover = async (email, phrase) => {
+    const { data } = await api.post("/auth/recover", { email, phrase });
     storage.setToken(data.token);
     setUser(data.user);
     return data;
@@ -144,6 +151,7 @@ export function AuthProvider({ children }) {
     serverOffset,
     register,
     login,
+    recover,
     beginSession,
     refresh,
     lock,

@@ -5,7 +5,7 @@ import { Logo } from "@/components/Logo";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import {
   ShieldCheck, KeyRound, Fingerprint, Layers, TrendingUp, Smartphone,
-  Lock, Eye, ArrowRight, Download, CheckCircle2, Wallet, Crown, Clock,
+  Lock, Eye, ArrowRight, LogIn, CheckCircle2, Wallet, Crown, Clock,
   LayoutDashboard, ArrowDownToLine, ArrowUpFromLine, Receipt, Sparkles, LockKeyhole,
   Coins, Percent, Timer, ArrowUp, Twitter, Send, Mail, FileText,
 } from "lucide-react";
@@ -33,7 +33,7 @@ const STATS = [
 ];
 
 const STEPS = [
-  { icon: Wallet, title: "Create your wallet", text: "Register with a unique username and save your 12-word recovery phrase — it's shown only once." },
+  { icon: Wallet, title: "Create your wallet", text: "Sign up with your email and password, then save your 12-word recovery phrase — it's shown only once." },
   { icon: Fingerprint, title: "Set a PIN", text: "Encrypt your phrase locally and unlock instantly every time you return." },
   { icon: Layers, title: "Stake into a vault", text: "Deposit XRP and choose a VIP vault matched to your tier and time horizon." },
   { icon: TrendingUp, title: "Earn live yield", text: "Profit accrues continuously and becomes withdrawable at maturity." },
@@ -345,8 +345,8 @@ export default function Landing() {
               <Link to="/create" data-testid="hero-get-started" className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6 py-3.5 rounded-xl glow-blue transition-all active:scale-95">
                 <Wallet size={18} /> Create your wallet
               </Link>
-              <Link to="/recover" data-testid="hero-login" className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold px-6 py-3.5 rounded-xl transition-colors">
-                <Download size={18} /> I have a phrase
+              <Link to="/login" data-testid="hero-login" className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold px-6 py-3.5 rounded-xl transition-colors">
+                <LogIn size={18} /> Log in
               </Link>
             </motion.div>
             <motion.div variants={fadeUp} initial="hidden" animate="show" custom={4} className="flex items-center gap-5 mt-8 text-xs text-slate-500">

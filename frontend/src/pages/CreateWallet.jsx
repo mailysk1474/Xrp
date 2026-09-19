@@ -12,28 +12,40 @@ export default function CreateWallet() {
   const { register, setVault, beginSession, apiError } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
-  const [form, setForm] = useState({ first_name: "", last_name: "", username: "" });
+  const [form, setForm] = useState({ first_name: "", last_name: "", email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [phrase, setPhrase] = useState("");
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [showPass, setShowPass] = useState(false);
   const [pin, setPin] = useState("");
   const [pin2, setPin2] = useState("");
   const [pinStage, setPinStage] = useState(0);
 
   const submitForm = async (e) => {
     e.preventDefault();
-    if (!form.first_name.trim() || !form.last_name.trim() || form.username.trim().length < 3) {
-      toast.error("Fill in your name and a username (3+ chars).");
+    const emailOk = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim());
+    if (!form.first_name.trim() || !form.last_name.trim()) {
+      toast.error("Enter your first and last name.");
+      return;
+    }
+    if (!emailOk) {
+      toast.error("Enter a valid email address.");
+      return;
+    }
+    if (form.password.length < 8) {
+      toast.error("Password must be at least 8 characters.");
       return;
     }
     setLoading(true);
     try {
-      const data = await register(form);
+      const data = await register({ ...form, email: form.email.trim().toLowerCase() });
       setPhrase(data.phrase);
       setUsername(data.user.username);
+      setEmail(data.user.email);
       setStep(1);
     } catch (err) {
       toast.error(apiError(err));
@@ -64,7 +76,7 @@ export default function CreateWallet() {
     setLoading(true);
     try {
       const enc = await encryptPhrase(phrase, pin);
-      setVault(username, enc);
+      setVault(username, enc, email);
       beginSession();
       toast.success("Wallet secured. Welcome to XamanProtocol.");
       navigate("/app");
@@ -88,7 +100,7 @@ export default function CreateWallet() {
               <KeyRound className="text-[#0030cf]" size={22} />
             </div>
             <h1 className="text-2xl font-bold text-slate-900">Create your wallet</h1>
-            <p className="text-sm text-slate-500 mt-2 mb-6">Private VIP access. We'll generate a fresh 12-word wallet for you — no email, no password.</p>
+            <p className="text-sm text-slate-500 mt-2 mb-6">Sign up with your email and a password. We'll generate a fresh 12-word wallet phrase for you — shown only once.</p>
             <form onSubmit={submitForm} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -101,17 +113,25 @@ export default function CreateWallet() {
                 </div>
               </div>
               <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf]">Username</label>
-                <input data-testid="register-username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value.replace(/\s/g, "") })} className={`${inputCls} font-mono`} placeholder="ada_vip" />
-                <p className="text-xs text-slate-400 mt-1.5">Must be unique. This is how you log in with your phrase.</p>
+                <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf]">Email</label>
+                <input data-testid="register-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={inputCls} placeholder="ada@example.com" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf]">Password</label>
+                <div className="relative">
+                  <input data-testid="register-password" type={showPass ? "text" : "password"} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className={`${inputCls} pr-12`} placeholder="At least 8 characters" />
+                  <button type="button" onClick={() => setShowPass((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 mt-0.5 text-slate-400 hover:text-slate-700">
+                    {showPass ? <EyeOff size={17} /> : <Eye size={17} />}
+                  </button>
+                </div>
               </div>
               <button type="submit" disabled={loading} data-testid="register-submit-button" className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3.5 rounded-xl glow-blue disabled:opacity-60 active:scale-[0.99] transition-all">
-                {loading ? <Loader2 className="animate-spin" size={18} /> : "Generate my wallet"}
+                {loading ? <Loader2 className="animate-spin" size={18} /> : "Create account"}
               </button>
             </form>
             <p className="text-center text-sm text-slate-500 mt-5">
-              Already have a phrase?{" "}
-              <button onClick={() => navigate("/recover")} data-testid="goto-recover-link" className="text-[#0030cf] font-medium hover:underline">Recover / log in</button>
+              Already have an account?{" "}
+              <button onClick={() => navigate("/login")} data-testid="goto-login-link" className="text-[#0030cf] font-medium hover:underline">Log in</button>
             </p>
           </motion.div>
         )}
