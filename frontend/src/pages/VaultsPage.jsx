@@ -14,7 +14,7 @@ export default function VaultsPage() {
   const [amount, setAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
-  const [compareAmount, setCompareAmount] = useState(1000);
+  const [compareAmount, setCompareAmount] = useState(50000);
 
   useEffect(() => {
     api.get("/vaults").then(({ data }) => setVaults(data.vaults)).catch(() => {});

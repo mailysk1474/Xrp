@@ -40,22 +40,22 @@ YEAR_SECONDS = 365 * 24 * 3600
 
 DEFAULT_VAULTS = [
     {"key": "xrp_flex", "name": "XRP Flex", "apy": 0.052, "duration_days": 0, "tier": "flex",
-     "min_amount": 10, "description": "Flexible XRP staking. Withdraw anytime after maturity ticks.", "enabled": True},
+     "min_amount": 50000, "description": "Flexible XRP staking. Withdraw anytime after maturity ticks.", "enabled": True},
     {"key": "vip_silver", "name": "VIP Silver", "apy": 0.192, "duration_days": 30, "tier": "silver",
-     "min_amount": 1000, "description": "30-day locked VIP vault for Silver members and above.", "enabled": True},
+     "min_amount": 150000, "description": "30-day locked VIP vault for Silver members and above.", "enabled": True},
     {"key": "vip_gold", "name": "VIP Gold", "apy": 0.384, "duration_days": 45, "tier": "gold",
-     "min_amount": 5000, "description": "45-day locked VIP vault. Elevated Gold yield.", "enabled": True},
+     "min_amount": 350000, "description": "45-day locked VIP vault. Elevated Gold yield.", "enabled": True},
     {"key": "vip_platinum", "name": "VIP Platinum", "apy": 0.836, "duration_days": 60, "tier": "platinum",
-     "min_amount": 25000, "description": "60-day locked Platinum vault. Premium yield tier.", "enabled": True},
+     "min_amount": 750000, "description": "60-day locked Platinum vault. Premium yield tier.", "enabled": True},
     {"key": "vip_diamond", "name": "VIP Diamond", "apy": 1.56, "duration_days": 90, "tier": "diamond",
-     "min_amount": 100000, "description": "90-day locked Diamond vault. Maximum protocol yield.", "enabled": True},
+     "min_amount": 2000000, "description": "90-day locked Diamond vault. Maximum protocol yield.", "enabled": True},
 ]
 
 TIER_THRESHOLDS = [
-    ("diamond", 100000),
-    ("platinum", 25000),
-    ("gold", 5000),
-    ("silver", 1000),
+    ("diamond", 2000000),
+    ("platinum", 750000),
+    ("gold", 350000),
+    ("silver", 150000),
     ("starter", 0),
 ]
 
@@ -200,7 +200,7 @@ def compute_tier(total_staked: float) -> str:
 
 def next_tier_progress(total_staked: float):
     order = ["starter", "silver", "gold", "platinum", "diamond"]
-    thresholds = {"starter": 0, "silver": 1000, "gold": 5000, "platinum": 25000, "diamond": 100000}
+    thresholds = {"starter": 0, "silver": 150000, "gold": 350000, "platinum": 750000, "diamond": 2000000}
     current = compute_tier(total_staked)
     idx = order.index(current)
     if idx >= len(order) - 1:
