@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Download, X, Share, Plus, MoreVertical } from "lucide-react";
+import { InstallGuide } from "@/components/InstallGuide";
 
 const DISMISS_KEY = "xp_install_dismissed";
 
@@ -102,6 +103,7 @@ export function InstallPrompt() {
         ) : (
           instructions[mode]
         )}
+        <InstallGuide />
       </div>
       {mode === "chrome" && (
         <button

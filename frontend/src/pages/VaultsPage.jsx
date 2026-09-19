@@ -16,7 +16,7 @@ export default function VaultsPage() {
   const [amount, setAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
-  const [compareAmount, setCompareAmount] = useState(50000);
+  const [compareAmount, setCompareAmount] = useState(25000);
 
   useEffect(() => {
     api.get("/vaults").then(({ data }) => setVaults(data.vaults)).catch(() => {});
@@ -103,7 +103,7 @@ export default function VaultsPage() {
               </tbody>
             </table>
           </div>
-          <p className="text-xs text-slate-400 mt-3">Illustrative projections based on each vault's fixed APY. "Yield at maturity" reflects the lock term; flexible vaults show one year.</p>
+          <p className="text-xs text-slate-400 mt-3">Illustrative projections based on each vault&apos;s fixed APY. &ldquo;Yield at maturity&rdquo; reflects the lock term; flexible vaults show one year.</p>
         </motion.div>
       )}
 

@@ -10,6 +10,7 @@ import {
   Coins, Percent, Timer, ArrowUp, Twitter, Send, Mail, FileText,
 } from "lucide-react";
 import { openSupportChat } from "@/lib/support";
+import { InstallGuide } from "@/components/InstallGuide";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
@@ -602,6 +603,7 @@ export default function Landing() {
               <ul className="space-y-3 text-sm">
                 <li><Link to="/create" data-testid="footer-create" className="hover:text-white transition-colors">Create wallet</Link></li>
                 <li><Link to="/recover" className="hover:text-white transition-colors">I have a phrase</Link></li>
+                <li><InstallGuide triggerClassName="hover:text-white transition-colors" /></li>
                 <li><button type="button" onClick={openSupportChat} data-testid="footer-contact-support" className="hover:text-white transition-colors">Contact support</button></li>
               </ul>
             </div>

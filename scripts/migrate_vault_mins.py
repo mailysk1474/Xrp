@@ -6,11 +6,11 @@ from pathlib import Path
 load_dotenv(Path(__file__).resolve().parent.parent / "backend" / ".env")
 
 NEW_MINS = {
-    "xrp_flex": 50000,
-    "vip_silver": 150000,
-    "vip_gold": 350000,
-    "vip_platinum": 750000,
-    "vip_diamond": 2000000,
+    "xrp_flex": 25000,
+    "vip_silver": 50000,
+    "vip_gold": 100000,
+    "vip_platinum": 250000,
+    "vip_diamond": 500000,
 }
 
 

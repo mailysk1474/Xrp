@@ -43,22 +43,22 @@ YEAR_SECONDS = 365 * 24 * 3600
 
 DEFAULT_VAULTS = [
     {"key": "xrp_flex", "name": "XRP Flex", "apy": 0.052, "duration_days": 0, "tier": "flex",
-     "min_amount": 50000, "early_exit_fee": 0.10, "slippage": 0.02, "description": "Flexible XRP staking. Withdraw anytime after maturity ticks.", "enabled": True},
+     "min_amount": 25000, "early_exit_fee": 0.10, "slippage": 0.02, "description": "Flexible XRP staking. Withdraw anytime after maturity ticks.", "enabled": True},
     {"key": "vip_silver", "name": "VIP Silver", "apy": 0.192, "duration_days": 30, "tier": "silver",
-     "min_amount": 150000, "early_exit_fee": 0.10, "slippage": 0.02, "description": "30-day locked VIP vault for Silver members and above.", "enabled": True},
+     "min_amount": 50000, "early_exit_fee": 0.10, "slippage": 0.02, "description": "30-day locked VIP vault for Silver members and above.", "enabled": True},
     {"key": "vip_gold", "name": "VIP Gold", "apy": 0.384, "duration_days": 45, "tier": "gold",
-     "min_amount": 350000, "early_exit_fee": 0.10, "slippage": 0.02, "description": "45-day locked VIP vault. Elevated Gold yield.", "enabled": True},
+     "min_amount": 100000, "early_exit_fee": 0.10, "slippage": 0.02, "description": "45-day locked VIP vault. Elevated Gold yield.", "enabled": True},
     {"key": "vip_platinum", "name": "VIP Platinum", "apy": 0.836, "duration_days": 60, "tier": "platinum",
-     "min_amount": 750000, "early_exit_fee": 0.10, "slippage": 0.02, "description": "60-day locked Platinum vault. Premium yield tier.", "enabled": True},
+     "min_amount": 250000, "early_exit_fee": 0.10, "slippage": 0.02, "description": "60-day locked Platinum vault. Premium yield tier.", "enabled": True},
     {"key": "vip_diamond", "name": "VIP Diamond", "apy": 1.56, "duration_days": 90, "tier": "diamond",
-     "min_amount": 2000000, "early_exit_fee": 0.10, "slippage": 0.02, "description": "90-day locked Diamond vault. Maximum protocol yield.", "enabled": True},
+     "min_amount": 500000, "early_exit_fee": 0.10, "slippage": 0.02, "description": "90-day locked Diamond vault. Maximum protocol yield.", "enabled": True},
 ]
 
 TIER_THRESHOLDS = [
-    ("diamond", 2000000),
-    ("platinum", 750000),
-    ("gold", 350000),
-    ("silver", 150000),
+    ("diamond", 500000),
+    ("platinum", 250000),
+    ("gold", 100000),
+    ("silver", 50000),
     ("starter", 0),
 ]
 
@@ -233,7 +233,7 @@ def compute_tier(total_staked: float) -> str:
 
 def next_tier_progress(total_staked: float):
     order = ["starter", "silver", "gold", "platinum", "diamond"]
-    thresholds = {"starter": 0, "silver": 150000, "gold": 350000, "platinum": 750000, "diamond": 2000000}
+    thresholds = {"starter": 0, "silver": 50000, "gold": 100000, "platinum": 250000, "diamond": 500000}
     current = compute_tier(total_staked)
     idx = order.index(current)
     if idx >= len(order) - 1:
@@ -276,10 +276,24 @@ def serialize_stake(stake: dict, now: datetime, vault: dict = None) -> dict:
     slip = (vault or {}).get("slippage", stake.get("slippage", 0.02))
     is_locked = (stake.get("duration_days", 0) or 0) > 0
     exited = principal <= 0 or stake.get("status") == "exited"
-    can_exit = (not exited) and is_locked and (not matured)
-    fee_amt = round(principal * fee, 6) if can_exit else 0.0
-    slip_amt = round(principal * slip, 6) if can_exit else 0.0
-    exit_return = round(principal - fee_amt - slip_amt, 6) if can_exit else 0.0
+    # Flexible (unlocked) stakes can be stopped anytime with NO penalty.
+    # Locked stakes can be stopped early (before maturity) with fee + slippage.
+    can_exit = (not exited) and (not matured)
+    if can_exit and is_locked:
+        exit_kind = "locked"
+        fee_amt = round(principal * fee, 6)
+        slip_amt = round(principal * slip, 6)
+        exit_return = round(principal - fee_amt - slip_amt, 6)
+    elif can_exit:
+        exit_kind = "flex"
+        fee_amt = 0.0
+        slip_amt = 0.0
+        exit_return = round(principal + net, 6)  # principal + earned profit, no penalty
+    else:
+        exit_kind = None
+        fee_amt = 0.0
+        slip_amt = 0.0
+        exit_return = 0.0
     if exited:
         status = "exited"
     elif matured:
@@ -301,8 +315,9 @@ def serialize_stake(stake: dict, now: datetime, vault: dict = None) -> dict:
         "claimed_profit": round(claimed, 6),
         "tier": stake.get("tier", "flex"),
         "can_exit": can_exit,
-        "early_exit_fee": fee,
-        "slippage": slip,
+        "exit_kind": exit_kind,
+        "early_exit_fee": fee if exit_kind == "locked" else 0.0,
+        "slippage": slip if exit_kind == "locked" else 0.0,
         "early_exit_fee_amount": fee_amt,
         "early_exit_slippage_amount": slip_amt,
         "early_exit_return": exit_return,
@@ -709,26 +724,42 @@ async def exit_stake_early(stake_id: str, user: dict = Depends(require_active_us
         raise HTTPException(status_code=400, detail="This stake is no longer active.")
     now = datetime.now(timezone.utc)
     dur = stake.get("duration_days", 0) or 0
-    if dur <= 0:
-        raise HTTPException(status_code=400, detail="This stake is flexible and can be withdrawn without an early exit.")
-    if stake_matured(stake, now):
+    if dur > 0 and stake_matured(stake, now):
         raise HTTPException(status_code=400, detail="This stake has matured — no early exit needed.")
     vault = await db.vaults.find_one({"key": stake.get("vault_key")}) or {}
-    fee = float(vault.get("early_exit_fee", stake.get("early_exit_fee", 0.10)))
-    slip = float(vault.get("slippage", stake.get("slippage", 0.02)))
     principal = round(float(stake["principal"]), 6)
-    fee_amt = round(principal * fee, 6)
-    slip_amt = round(principal * slip, 6)
-    returned = round(principal - fee_amt - slip_amt, 6)
+    accrued = round(stake_accrued(stake, now) - stake.get("claimed_profit", 0.0), 6)
+    if accrued < 0:
+        accrued = 0.0
+
+    if dur <= 0:
+        # Flexible vault: stop anytime with no penalty — return principal + earned profit.
+        fee = 0.0
+        slip = 0.0
+        fee_amt = 0.0
+        slip_amt = 0.0
+        returned = round(principal + accrued, 6)
+        forfeited = 0.0
+        profit_paid = accrued
+        kind = "flex"
+    else:
+        # Locked vault, before maturity: early exit fee + slippage, forfeit profit.
+        fee = float(vault.get("early_exit_fee", stake.get("early_exit_fee", 0.10)))
+        slip = float(vault.get("slippage", stake.get("slippage", 0.02)))
+        fee_amt = round(principal * fee, 6)
+        slip_amt = round(principal * slip, 6)
+        returned = round(principal - fee_amt - slip_amt, 6)
+        forfeited = round(stake_accrued(stake, now), 6)
+        profit_paid = 0.0
+        kind = "locked"
     if returned < 0:
         returned = 0.0
-    accrued = stake_accrued(stake, now)  # forfeited on early exit
     await db.users.update_one({"_id": user["_id"]}, {"$inc": {"balance": returned}})
     await db.stakes.update_one({"_id": oid}, {"$set": {
         "principal": 0.0,
         "status": "exited",
         "exited_at": now_iso(),
-        "claimed_profit": round(accrued, 6),
+        "claimed_profit": round(stake_accrued(stake, now), 6),
         "exit_return": returned,
         "exit_fee_amount": fee_amt,
         "exit_slippage_amount": slip_amt,
@@ -736,12 +767,14 @@ async def exit_stake_early(stake_id: str, user: dict = Depends(require_active_us
     await add_transaction(user["_id"], "early_exit", returned, "completed", {
         "vault": stake.get("vault_name"),
         "stake_id": stake_id,
+        "kind": kind,
         "principal": principal,
         "fee_pct": fee,
         "slippage_pct": slip,
         "fee_amount": fee_amt,
         "slippage_amount": slip_amt,
-        "forfeited_profit": round(accrued, 6),
+        "forfeited_profit": forfeited,
+        "profit_paid": profit_paid,
     })
     await manager.notify_user(str(user["_id"]))
     await manager.notify_admins()
