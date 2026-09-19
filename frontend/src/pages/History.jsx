@@ -3,13 +3,14 @@ import { motion } from "framer-motion";
 import { api } from "@/lib/api";
 import { usePrice } from "@/context/PriceContext";
 import { fmtXRP, fmtDate, xrpToUsdLabel } from "@/lib/format";
-import { ArrowDownToLine, ArrowUpFromLine, Layers, Sparkles, Settings2, Receipt, LogOut } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, Layers, Sparkles, Settings2, Receipt, LogOut, CheckCircle2 } from "lucide-react";
 
 const TYPE_META = {
   deposit: { label: "Deposit", icon: ArrowDownToLine, color: "#059669", sign: "+" },
   withdrawal: { label: "Withdrawal", icon: ArrowUpFromLine, color: "#D97706", sign: "-" },
   stake: { label: "Stake", icon: Layers, color: "#0030cf", sign: "-" },
   early_exit: { label: "Early exit", icon: LogOut, color: "#DC2626", sign: "+" },
+  stake_closed: { label: "Stake completed", icon: CheckCircle2, color: "#059669", sign: "+" },
   reinvest: { label: "Restake", icon: Sparkles, color: "#7C3AED", sign: "" },
   profit: { label: "Profit bonus", icon: Sparkles, color: "#059669", sign: "+" },
   adjustment: { label: "Adjustment", icon: Settings2, color: "#64748B", sign: "" },

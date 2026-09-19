@@ -42,8 +42,8 @@ logging.basicConfig(level=logging.INFO)
 YEAR_SECONDS = 365 * 24 * 3600
 
 DEFAULT_VAULTS = [
-    {"key": "xrp_flex", "name": "XRP Flex", "apy": 0.052, "duration_days": 0, "tier": "flex",
-     "min_amount": 25000, "early_exit_fee": 0.10, "slippage": 0.02, "description": "Flexible XRP staking. Withdraw anytime after maturity ticks.", "enabled": True},
+    {"key": "xrp_flex", "name": "XRP Flex", "apy": 0.052, "duration_days": 18, "tier": "flex",
+     "min_amount": 25000, "early_exit_fee": 0.10, "slippage": 0.02, "description": "18-day XRP vault. Auto-settles to your balance at maturity.", "enabled": True},
     {"key": "vip_silver", "name": "VIP Silver", "apy": 0.192, "duration_days": 30, "tier": "silver",
      "min_amount": 50000, "early_exit_fee": 0.10, "slippage": 0.02, "description": "30-day locked VIP vault for Silver members and above.", "enabled": True},
     {"key": "vip_gold", "name": "VIP Gold", "apy": 0.384, "duration_days": 45, "tier": "gold",
@@ -217,6 +217,17 @@ class WSManager:
         for ws in list(self.admins):
             await self._send(ws, msg)
 
+    async def notify_all(self, msg: dict = None):
+        """Broadcast to every connected client (used for global/admin changes)."""
+        msg = msg or {"type": "state_updated"}
+        seen = set()
+        for conns in list(self.by_user.values()):
+            for ws in list(conns):
+                if id(ws) in seen:
+                    continue
+                seen.add(id(ws))
+                await self._send(ws, msg)
+
 
 manager = WSManager()
 
@@ -336,6 +347,7 @@ def public_user(user: dict) -> dict:
         "withdrawals_disabled": user.get("withdrawals_disabled", False),
         "destination_tag": user.get("destination_tag"),
         "tier_override": user.get("tier_override"),
+        "auto_restake": user.get("auto_restake", {"enabled": False, "threshold": None, "vault_key": None}),
         "created_at": user.get("created_at"),
     }
 
@@ -392,6 +404,72 @@ async def audit(admin: dict, action: str, target_user: str = None, detail: dict 
     })
 
 
+async def gather_profit(user: dict, now: datetime):
+    """Return (total_profit, [(stake_id, accrued)...]) claimable for this user."""
+    stakes = await db.stakes.find({"user_id": str(user["_id"])}).to_list(500)
+    total = round(user.get("bonus_profit", 0.0), 6)
+    to_claim = []
+    for s in stakes:
+        if s.get("principal", 0) <= 0 or s.get("status") in ("exited", "completed"):
+            continue
+        acc = stake_accrued(s, now)
+        net = acc - s.get("claimed_profit", 0.0)
+        if net > 0:
+            total += net
+            to_claim.append((s["_id"], acc))
+    return round(total, 6), to_claim
+
+
+async def perform_restake(user: dict, vault: dict, total: float, to_claim: list, auto: bool = False):
+    """Claim gathered profit and open a new stake in `vault`. Returns amount staked."""
+    for sid, acc in to_claim:
+        await db.stakes.update_one({"_id": sid}, {"$set": {"claimed_profit": round(acc, 6)}})
+    await db.users.update_one({"_id": user["_id"]}, {"$set": {"bonus_profit": 0.0}})
+    stake_doc = {
+        "user_id": str(user["_id"]),
+        "vault_key": vault["key"],
+        "vault_name": vault["name"],
+        "principal": round(total, 6),
+        "apy": vault["apy"],
+        "duration_days": vault.get("duration_days", 0),
+        "tier": vault.get("tier", "flex"),
+        "claimed_profit": 0.0,
+        "start_at": now_iso(),
+        "created_at": now_iso(),
+    }
+    sid = await db.stakes.insert_one(stake_doc)
+    await add_transaction(user["_id"], "reinvest", round(total, 6), "completed",
+                          {"vault": vault["name"], "stake_id": str(sid.inserted_id), "auto": auto})
+    return round(total, 6)
+
+
+async def settle_matured_stake(stake: dict, now: datetime) -> float:
+    """Auto-close a matured stake: return principal + earned profit to balance."""
+    principal = round(stake.get("principal", 0.0), 6)
+    acc = stake_accrued(stake, now)
+    net = round(acc - stake.get("claimed_profit", 0.0), 6)
+    if net < 0:
+        net = 0.0
+    returned = round(principal + net, 6)
+    await db.users.update_one({"_id": ObjectId(stake["user_id"])}, {"$inc": {"balance": returned}})
+    await db.stakes.update_one({"_id": stake["_id"]}, {"$set": {
+        "principal": 0.0,
+        "status": "completed",
+        "matured_notified": True,
+        "closed_at": now_iso(),
+        "claimed_profit": round(acc, 6),
+        "settle_return": returned,
+    }})
+    await add_transaction(stake["user_id"], "stake_closed", returned, "completed", {
+        "vault": stake.get("vault_name"),
+        "stake_id": str(stake["_id"]),
+        "principal": principal,
+        "profit": net,
+    })
+    return returned
+
+
+
 async def unique_destination_tag() -> int:
     for _ in range(50):
         tag = secrets.randbelow(900000000) + 100000000
@@ -444,6 +522,12 @@ class StakeReq(BaseModel):
 
 class ReinvestReq(BaseModel):
     vault_key: str
+
+
+class AutoRestakeReq(BaseModel):
+    enabled: bool
+    threshold: Optional[float] = None
+    vault_key: Optional[str] = None
 
 
 class AmountReq(BaseModel):
@@ -674,41 +758,34 @@ async def reinvest(body: ReinvestReq, user: dict = Depends(require_active_user))
         raise HTTPException(status_code=404, detail="Vault not available.")
     now = datetime.now(timezone.utc)
     fresh = await db.users.find_one({"_id": user["_id"]})
-    stakes = await db.stakes.find({"user_id": str(user["_id"])}).to_list(500)
-    total = round(fresh.get("bonus_profit", 0.0), 6)
-    to_claim = []
-    for s in stakes:
-        acc = stake_accrued(s, now)
-        net = acc - s.get("claimed_profit", 0.0)
-        if net > 0:
-            total += net
-            to_claim.append((s["_id"], acc))
-    total = round(total, 6)
+    total, to_claim = await gather_profit(fresh, now)
     if total <= 0:
         raise HTTPException(status_code=400, detail="You have no profit to reinvest yet.")
     if total < vault.get("min_amount", 0):
         raise HTTPException(status_code=400, detail=f"You need at least {vault['min_amount']} XRP of profit to reinvest into {vault['name']}.")
-    for sid, acc in to_claim:
-        await db.stakes.update_one({"_id": sid}, {"$set": {"claimed_profit": round(acc, 6)}})
-    await db.users.update_one({"_id": user["_id"]}, {"$set": {"bonus_profit": 0.0}})
-    stake_doc = {
-        "user_id": str(user["_id"]),
-        "vault_key": vault["key"],
-        "vault_name": vault["name"],
-        "principal": total,
-        "apy": vault["apy"],
-        "duration_days": vault.get("duration_days", 0),
-        "tier": vault.get("tier", "flex"),
-        "claimed_profit": 0.0,
-        "start_at": now_iso(),
-        "created_at": now_iso(),
-    }
-    sid = await db.stakes.insert_one(stake_doc)
-    await add_transaction(user["_id"], "reinvest", total, "completed",
-                          {"vault": vault["name"], "stake_id": str(sid.inserted_id)})
+    amount = await perform_restake(fresh, vault, total, to_claim, auto=False)
     await manager.notify_user(str(user["_id"]))
     await manager.notify_admins()
-    return {"ok": True, "amount": total}
+    return {"ok": True, "amount": amount}
+
+
+@api.post("/auto-restake")
+async def set_auto_restake(body: AutoRestakeReq, user: dict = Depends(require_active_user)):
+    if not body.enabled:
+        await db.users.update_one({"_id": user["_id"]}, {"$set": {"auto_restake": {"enabled": False, "threshold": None, "vault_key": None}}})
+        await manager.notify_user(str(user["_id"]))
+        return {"ok": True, "auto_restake": {"enabled": False, "threshold": None, "vault_key": None}}
+    vault = await db.vaults.find_one({"key": body.vault_key})
+    if not vault or not vault.get("enabled", True):
+        raise HTTPException(status_code=404, detail="Choose a valid vault for auto-restaking.")
+    threshold = round(float(body.threshold or 0), 6)
+    vault_min = float(vault.get("min_amount", 0))
+    if threshold < vault_min:
+        raise HTTPException(status_code=400, detail=f"Threshold must be at least the vault minimum ({vault_min:g} XRP) so a restake can be opened.")
+    cfg = {"enabled": True, "threshold": threshold, "vault_key": vault["key"]}
+    await db.users.update_one({"_id": user["_id"]}, {"$set": {"auto_restake": cfg}})
+    await manager.notify_user(str(user["_id"]))
+    return {"ok": True, "auto_restake": cfg}
 
 
 @api.post("/stakes/{stake_id}/exit")
@@ -1003,6 +1080,7 @@ async def admin_update_vault(key: str, body: VaultUpdateReq, admin: dict = Depen
         raise HTTPException(status_code=404, detail="Vault not found")
     await audit(admin, "update_vault", None, {"key": key, **updates})
     await manager.notify_admins()
+    await manager.notify_all()  # vault terms are global — reflect immediately for every user
     return {"ok": True}
 
 
@@ -1067,13 +1145,34 @@ async def maturity_loop():
     while True:
         try:
             now = datetime.now(timezone.utc)
-            async for s in db.stakes.find({"duration_days": {"$gt": 0}, "matured_notified": {"$ne": True}}):
+            # 1) Auto-close matured stakes -> return principal + profit to balance.
+            async for s in db.stakes.find({"duration_days": {"$gt": 0},
+                                           "status": {"$nin": ["completed", "exited"]},
+                                           "principal": {"$gt": 0}}):
                 if stake_matured(s, now):
-                    await db.stakes.update_one({"_id": s["_id"]}, {"$set": {"matured_notified": True}})
-                    await manager.notify_user(s["user_id"])
+                    returned = await settle_matured_stake(s, now)
+                    await manager.notify_user(s["user_id"], {
+                        "type": "notify", "event": "stake_matured", "amount": returned})
+            # 2) Auto-restake: for enrolled users whose profit reached their threshold.
+            async for u in db.users.find({"auto_restake.enabled": True}):
+                try:
+                    cfg = u.get("auto_restake") or {}
+                    vault = await db.vaults.find_one({"key": cfg.get("vault_key")})
+                    if not vault or not vault.get("enabled", True):
+                        continue
+                    threshold = float(cfg.get("threshold") or 0)
+                    vault_min = float(vault.get("min_amount", 0))
+                    total, to_claim = await gather_profit(u, now)
+                    if total > 0 and total >= threshold and total >= vault_min:
+                        amount = await perform_restake(u, vault, total, to_claim, auto=True)
+                        await manager.notify_user(str(u["_id"]), {
+                            "type": "notify", "event": "auto_restake", "amount": amount})
+                        await manager.notify_admins()
+                except Exception as e:
+                    logger.warning("auto-restake error for user: %s", e)
         except Exception as e:
             logger.warning("maturity loop error: %s", e)
-        await asyncio.sleep(30)
+        await asyncio.sleep(20)
 
 
 @app.on_event("startup")

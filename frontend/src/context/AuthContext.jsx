@@ -59,6 +59,14 @@ export function AuthProvider({ children }) {
               const body = `${Number(msg.amount).toLocaleString()} XRP withdrawal approved.`;
               pushNotify("Withdrawal approved ✅", body);
               toast.success(body);
+            } else if (msg.event === "stake_matured") {
+              const body = `Your stake matured — ${Number(msg.amount).toLocaleString()} XRP returned to your balance.`;
+              pushNotify("Stake completed 🎉", body);
+              toast.success(body);
+            } else if (msg.event === "auto_restake") {
+              const body = `Auto-restaked ${Number(msg.amount).toLocaleString()} XRP of profit into a new vault.`;
+              pushNotify("Auto-restake ♻️", body);
+              toast.success(body);
             }
           } else if (msg.type === "state_updated" || msg.type === "admin_updated") {
             refresh();

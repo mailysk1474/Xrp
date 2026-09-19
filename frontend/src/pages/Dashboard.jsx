@@ -10,6 +10,7 @@ import { ensureNotifyPermission } from "@/lib/notify";
 import { fmtXRP, xrpToUsdLabel, TIER_META } from "@/lib/format";
 import { motion } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 import {
   TrendingUp, Layers, ArrowDownToLine, ArrowUpFromLine,
   Lock, Crown, Sparkles, Clock, Repeat, Loader2, LogOut, AlertTriangle,
@@ -161,6 +162,94 @@ function Row({ label, value, sub, negative, positive, strong }) {
   );
 }
 
+function AutoRestakeCard({ config, onDone }) {
+  const { rate } = usePrice();
+  const [vaults, setVaults] = useState([]);
+  const [enabled, setEnabled] = useState(!!config?.enabled);
+  const [threshold, setThreshold] = useState(config?.threshold ? String(config.threshold) : "");
+  const [vaultKey, setVaultKey] = useState(config?.vault_key || "");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api.get("/vaults").then(({ data }) => {
+      const enabledVaults = data.vaults.filter((v) => v.enabled !== false);
+      setVaults(enabledVaults);
+      if (!config?.vault_key && enabledVaults[0]) setVaultKey((k) => k || enabledVaults[0].key);
+    }).catch(() => {});
+  }, [config?.vault_key]);
+
+  const selectedVault = vaults.find((v) => v.key === vaultKey);
+
+  const save = async (nextEnabled) => {
+    const on = nextEnabled ?? enabled;
+    setBusy(true);
+    try {
+      const payload = on
+        ? { enabled: true, threshold: parseFloat(threshold) || 0, vault_key: vaultKey }
+        : { enabled: false };
+      const { data } = await api.post("/auto-restake", payload);
+      setEnabled(data.auto_restake.enabled);
+      toast.success(on ? "Auto-restake enabled." : "Auto-restake turned off.");
+      onDone?.();
+    } catch (err) {
+      toast.error(apiError(err));
+      setEnabled(!!config?.enabled); // revert toggle on error
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggle = (val) => {
+    setEnabled(val);
+    if (!val) save(false);
+  };
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm" data-testid="auto-restake-card">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center">
+            <Repeat size={17} className="text-[#0030cf]" />
+          </div>
+          <div>
+            <p className="font-semibold text-slate-900">Auto-restake profit</p>
+            <p className="text-xs text-slate-500">Automatically restake your profit once it reaches your set amount.</p>
+          </div>
+        </div>
+        <Switch checked={enabled} onCheckedChange={toggle} disabled={busy} data-testid="auto-restake-switch" />
+      </div>
+
+      {enabled && (
+        <div className="mt-4 space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf]">Trigger amount (XRP)</label>
+              <input type="number" value={threshold} onChange={(e) => setThreshold(e.target.value)} data-testid="auto-restake-threshold" className="mt-1.5 w-full bg-slate-50 border border-slate-300 focus:border-blue-500 rounded-xl px-3 py-2.5 font-mono text-sm outline-none" placeholder="e.g. 25000" />
+              {rate && threshold ? <p className="text-[11px] text-slate-400 font-mono mt-1">{xrpToUsdLabel(parseFloat(threshold), rate, 0)}</p> : null}
+            </div>
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf]">Restake into</label>
+              <select value={vaultKey} onChange={(e) => setVaultKey(e.target.value)} data-testid="auto-restake-vault" className="mt-1.5 w-full bg-slate-50 border border-slate-300 focus:border-blue-500 rounded-xl px-3 py-2.5 text-sm outline-none">
+                {vaults.map((v) => (
+                  <option key={v.key} value={v.key}>{v.name} · min {fmtXRP(v.min_amount, 0)} XRP</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {selectedVault && (
+            <p className="text-xs text-slate-400">
+              When your profit reaches <span className="font-semibold text-slate-600">{fmtXRP(parseFloat(threshold) || 0, 0)} XRP</span>, it auto-restakes into <span className="font-semibold text-slate-600">{selectedVault.name}</span> (min {fmtXRP(selectedVault.min_amount, 0)} XRP).
+            </p>
+          )}
+          <button onClick={() => save(true)} disabled={busy} data-testid="auto-restake-save" className="w-full sm:w-auto flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors">
+            {busy ? <Loader2 className="animate-spin" size={16} /> : "Save auto-restake"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StatCard({ icon: Icon, label, children, accent = "#0030cf", testid, delay = 0 }) {
   return (
     <motion.div
@@ -286,6 +375,8 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      <AutoRestakeCard config={s.user?.auto_restake} onDone={refresh} />
 
       <div>
         <div className="flex items-center justify-between mb-3">

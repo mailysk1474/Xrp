@@ -19,7 +19,11 @@ export default function VaultsPage() {
   const [compareAmount, setCompareAmount] = useState(25000);
 
   useEffect(() => {
-    api.get("/vaults").then(({ data }) => setVaults(data.vaults)).catch(() => {});
+    const loadVaults = () => api.get("/vaults").then(({ data }) => setVaults(data.vaults)).catch(() => {});
+    loadVaults();
+    // Reflect admin changes to vault terms immediately for the user.
+    window.addEventListener("xp-refresh", loadVaults);
+    return () => window.removeEventListener("xp-refresh", loadVaults);
   }, []);
 
   const balance = serverState?.balance ?? 0;
