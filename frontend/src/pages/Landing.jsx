@@ -17,7 +17,7 @@ const fadeUp = {
 };
 
 const FEATURES = [
-  { icon: KeyRound, title: "Self-generated wallet", text: "A fresh 12-word wallet is created for you on sign-up. No email, no password — you hold the keys, always." },
+  { icon: KeyRound, title: "Self-generated wallet", text: "A fresh 12-word wallet is created for you on sign-up, encrypted on your device — you hold the keys, always." },
   { icon: Fingerprint, title: "PIN & biometric unlock", text: "Your recovery phrase is encrypted on your device behind a PIN. Daily access is a single, secure tap." },
   { icon: TrendingUp, title: "Live yield accrual", text: "Watch your profit tick up in real time across every VIP vault — second by second, never static." },
   { icon: Layers, title: "VIP staking vaults", text: "From flexible XRP Flex to the 90-day Diamond vault at 156% APY — rewards scale with your tier." },
@@ -43,7 +43,7 @@ const SECURITY = [
   { icon: KeyRound, title: "You own the keys", text: "A 12-word recovery phrase is generated on your device — no custodian ever holds your login." },
   { icon: LockKeyhole, title: "Encrypted on-device", text: "Your phrase is sealed with AES-256 behind your PIN and never stored in plain text." },
   { icon: Fingerprint, title: "PIN & biometric access", text: "Unlock with a passcode or your device's fingerprint / Face ID for daily convenience." },
-  { icon: ShieldCheck, title: "No email, no password", text: "Nothing to phish, nothing to leak. Recovery on any device uses only your phrase." },
+  { icon: ShieldCheck, title: "Non-custodial by design", text: "Your phrase is encrypted on-device behind your PIN. Recover on any device with your email and phrase." },
 ];
 
 const FAQS = [
@@ -339,7 +339,7 @@ export default function Landing() {
               Your VIP staking wallet, <span className="text-[#0030cf]">self-custody</span> in your pocket.
             </motion.h1>
             <motion.p variants={fadeUp} initial="hidden" animate="show" custom={2} className="text-lg text-slate-500 mt-6 max-w-lg leading-relaxed">
-              Generate a private wallet in seconds, stake XRP into premium vaults, and watch your yield accrue live — secured by a PIN only you control.
+              Sign up with email in seconds, stake XRP into premium vaults, and watch your yield accrue live — your keys secured by a PIN only you control.
             </motion.p>
             <motion.div variants={fadeUp} initial="hidden" animate="show" custom={3} className="flex flex-wrap gap-3 mt-8">
               <Link to="/create" data-testid="hero-get-started" className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6 py-3.5 rounded-xl glow-blue transition-all active:scale-95">
@@ -350,7 +350,7 @@ export default function Landing() {
               </Link>
             </motion.div>
             <motion.div variants={fadeUp} initial="hidden" animate="show" custom={4} className="flex items-center gap-5 mt-8 text-xs text-slate-500">
-              <span className="flex items-center gap-1.5"><CheckCircle2 size={14} className="text-emerald-500" /> No email required</span>
+              <span className="flex items-center gap-1.5"><CheckCircle2 size={14} className="text-emerald-500" /> Non-custodial</span>
               <span className="flex items-center gap-1.5"><CheckCircle2 size={14} className="text-emerald-500" /> Installable PWA</span>
             </motion.div>
           </div>
@@ -427,7 +427,7 @@ export default function Landing() {
         <div className="max-w-2xl mb-10">
           <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#0030cf]">Yield calculator</p>
           <h2 className="text-3xl sm:text-4xl font-bold mt-3 text-slate-900">See what your XRP could earn.</h2>
-          <p className="text-slate-500 mt-4 leading-relaxed">Set an amount, pick a vault, and watch the projected yield update live — figures are illustrative, based on each vault's fixed APY.</p>
+          <p className="text-slate-500 mt-4 leading-relaxed">Set an amount, pick a vault, and watch the projected yield update live — figures are illustrative, based on each vault&apos;s fixed APY.</p>
         </div>
         <YieldCalculator />
       </section>
@@ -482,7 +482,7 @@ export default function Landing() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#0030cf]">Security first</p>
             <h2 className="text-3xl sm:text-4xl font-bold mt-3 text-slate-900">Your keys. Your crypto. Uncompromised.</h2>
-            <p className="text-slate-500 mt-4 leading-relaxed">XamanProtocol is built on a simple principle: only you should be able to access your wallet. There's no password to steal and no account to hijack — just a phrase that lives with you.</p>
+            <p className="text-slate-500 mt-4 leading-relaxed">XamanProtocol is built on a simple principle: only you should be able to access your wallet. Your recovery phrase is generated and encrypted on your device, so your keys stay with you — not on our servers.</p>
             <div className="flex flex-wrap items-center gap-3 mt-6">
               <a href="/whitepaper.pdf" target="_blank" rel="noreferrer" data-testid="whitepaper-pdf-button" className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold px-5 py-3 rounded-xl glow-blue transition-all active:scale-95">
                 <FileText size={17} /> Read the Whitepaper
@@ -507,7 +507,7 @@ export default function Landing() {
         <div className="max-w-2xl">
           <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#0030cf]">Learn</p>
           <h2 className="text-3xl sm:text-4xl font-bold mt-3 text-slate-900">How staking yield works.</h2>
-          <p className="text-slate-500 mt-4 leading-relaxed">New to staking? Here's the short version — no jargon, just how your XRP goes to work.</p>
+          <p className="text-slate-500 mt-4 leading-relaxed">New to staking? Here&apos;s the short version — no jargon, just how your XRP goes to work.</p>
         </div>
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mt-12">
           {EDU.map((e, i) => (

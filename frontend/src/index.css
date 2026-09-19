@@ -13,19 +13,19 @@ html {
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-    --primary: 221 83% 53%;
+    --primary: 226 100% 41%;
     --primary-foreground: 0 0% 100%;
     --secondary: 210 40% 96%;
     --secondary-foreground: 222 47% 11%;
     --muted: 210 40% 96%;
     --muted-foreground: 215 16% 47%;
-    --accent: 221 83% 53%;
+    --accent: 226 100% 41%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
     --border: 214 32% 91%;
     --input: 214 32% 91%;
-    --ring: 221 83% 60%;
+    --ring: 226 100% 45%;
     --radius: 0.9rem;
 }
 
@@ -57,7 +57,7 @@ body {
 
 /* ---- Ambient / texture helpers (light) ---- */
 .bg-radial-blue {
-    background: radial-gradient(circle at 50% -10%, rgba(37, 99, 235, 0.08) 0%, rgba(255, 255, 255, 0) 55%);
+    background: radial-gradient(circle at 50% -10%, rgba(0, 48, 207, 0.08) 0%, rgba(255, 255, 255, 0) 55%);
 }
 .bg-grid {
     background-image:
@@ -66,14 +66,14 @@ body {
     background-size: 44px 44px;
 }
 .glow-blue {
-    box-shadow: 0 10px 28px -8px rgba(37, 99, 235, 0.45);
+    box-shadow: 0 10px 28px -8px rgba(0, 48, 207, 0.45);
 }
 .glow-card {
     transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s;
 }
 .glow-card:hover {
-    border-color: rgba(37, 99, 235, 0.35);
-    box-shadow: 0 12px 30px -10px rgba(37, 99, 235, 0.18);
+    border-color: rgba(0, 48, 207, 0.35);
+    box-shadow: 0 12px 30px -10px rgba(0, 48, 207, 0.18);
 }
 .tabular-nums {
     font-variant-numeric: tabular-nums;
