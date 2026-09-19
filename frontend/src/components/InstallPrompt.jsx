@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Download, X, Share, Plus } from "lucide-react";
+import { Download, X, Share, Plus, MoreVertical } from "lucide-react";
 
 const DISMISS_KEY = "xp_install_dismissed";
 
@@ -13,14 +13,17 @@ function isStandalone() {
 function isIOS() {
   const ua = window.navigator.userAgent || "";
   const iOSDevice = /iPad|iPhone|iPod/.test(ua);
-  // iPadOS 13+ reports as Mac; detect touch to catch it
   const iPadOS = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
   return iOSDevice || iPadOS;
 }
 
+function isAndroid() {
+  return /android/i.test(window.navigator.userAgent || "");
+}
+
 export function InstallPrompt() {
   const [deferred, setDeferred] = useState(null);
-  const [mode, setMode] = useState(null); // "chrome" | "ios"
+  const [mode, setMode] = useState(null); // "chrome" | "ios" | "android" | "generic"
 
   useEffect(() => {
     if (isStandalone()) return; // already installed
@@ -29,21 +32,24 @@ export function InstallPrompt() {
     const handler = (e) => {
       e.preventDefault();
       setDeferred(e);
-      setMode("chrome");
+      setMode("chrome"); // one-tap install available (Android/desktop Chrome & Edge)
     };
     window.addEventListener("beforeinstallprompt", handler);
 
-    // iOS Safari never fires beforeinstallprompt — show manual instructions.
-    let iosTimer;
-    if (isIOS()) {
-      iosTimer = setTimeout(() => {
-        setMode((m) => m || "ios");
-      }, 1500);
-    }
+    // If no one-tap prompt is offered shortly, fall back to manual instructions
+    // so an install path is shown on EVERY device/browser.
+    const timer = setTimeout(() => {
+      setMode((m) => {
+        if (m) return m; // already got the one-tap prompt
+        if (isIOS()) return "ios";
+        if (isAndroid()) return "android";
+        return "generic";
+      });
+    }, 2500);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handler);
-      if (iosTimer) clearTimeout(iosTimer);
+      clearTimeout(timer);
     };
   }, []);
 
@@ -62,6 +68,27 @@ export function InstallPrompt() {
     setDeferred(null);
   };
 
+  const instructions = {
+    ios: (
+      <p className="text-xs text-slate-500 flex flex-wrap items-center gap-1">
+        Tap <Share size={13} className="inline text-[#0030cf]" /> Share, then
+        <span className="font-medium text-slate-700">&quot;Add to Home Screen&quot;</span>
+        <Plus size={13} className="inline text-[#0030cf]" />
+      </p>
+    ),
+    android: (
+      <p className="text-xs text-slate-500 flex flex-wrap items-center gap-1">
+        Open the <MoreVertical size={13} className="inline text-[#0030cf]" /> menu, then
+        <span className="font-medium text-slate-700">&quot;Install app&quot;</span>
+      </p>
+    ),
+    generic: (
+      <p className="text-xs text-slate-500">
+        Open your browser menu and choose <span className="font-medium text-slate-700">&quot;Install&quot;</span> or <span className="font-medium text-slate-700">&quot;Add to Home Screen&quot;</span>.
+      </p>
+    ),
+  };
+
   return (
     <div
       className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] w-[92%] max-w-md bg-white border border-slate-200 rounded-2xl p-4 shadow-xl flex items-center gap-3"
@@ -73,11 +100,7 @@ export function InstallPrompt() {
         {mode === "chrome" ? (
           <p className="text-xs text-slate-500">Install XamanProtocol for a native app feel.</p>
         ) : (
-          <p className="text-xs text-slate-500 flex flex-wrap items-center gap-1">
-            Tap <Share size={13} className="inline text-[#0030cf]" /> Share, then
-            <span className="font-medium text-slate-700">&quot;Add to Home Screen&quot;</span>
-            <Plus size={13} className="inline text-[#0030cf]" />
-          </p>
+          instructions[mode]
         )}
       </div>
       {mode === "chrome" && (
