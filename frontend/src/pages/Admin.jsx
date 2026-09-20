@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Users, ArrowDownToLine, ArrowUpFromLine, ScrollText, Lock, Search,
-  Loader2, Check, X, Crown, Plus, Minus, Sliders, LayoutDashboard, Layers, Mail, Copy, Wallet, Clock,
+  Loader2, Check, X, Crown, Plus, Minus, Sliders, LayoutDashboard, Layers, Mail, Copy, Wallet, Clock, TrendingUp,
 } from "lucide-react";
 
 const TIERS = ["auto", "starter", "silver", "gold", "platinum", "diamond"];
@@ -46,12 +46,14 @@ export default function Admin() {
             <TabsTrigger value="deposits" data-testid="admin-tab-deposits" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg text-slate-600"><ArrowDownToLine size={15} className="mr-1.5" /> Deposits</TabsTrigger>
             <TabsTrigger value="withdrawals" data-testid="admin-tab-withdrawals" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg text-slate-600"><ArrowUpFromLine size={15} className="mr-1.5" /> Withdrawals</TabsTrigger>
             <TabsTrigger value="vaults" data-testid="admin-tab-vaults" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg text-slate-600"><Layers size={15} className="mr-1.5" /> Vaults</TabsTrigger>
+            <TabsTrigger value="profit" data-testid="admin-tab-profit" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg text-slate-600"><TrendingUp size={15} className="mr-1.5" /> Profit Log</TabsTrigger>
             <TabsTrigger value="audit" data-testid="admin-tab-audit" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg text-slate-600"><ScrollText size={15} className="mr-1.5" /> Audit</TabsTrigger>
           </TabsList>
           <TabsContent value="users" className="mt-5"><UsersTab /></TabsContent>
           <TabsContent value="deposits" className="mt-5"><DepositsTab /></TabsContent>
           <TabsContent value="withdrawals" className="mt-5"><WithdrawalsTab /></TabsContent>
           <TabsContent value="vaults" className="mt-5"><VaultsTab /></TabsContent>
+          <TabsContent value="profit" className="mt-5"><ProfitLogTab /></TabsContent>
           <TabsContent value="audit" className="mt-5"><AuditTab /></TabsContent>
         </Tabs>
       </main>
@@ -361,6 +363,40 @@ function AuditTab() {
           <span className="ml-auto text-xs text-slate-400">{fmtDate(l.created_at)}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+
+function ProfitLogTab() {
+  const [logs, setLogs] = useState(null);
+  const load = useCallback(() => api.get("/admin/profit-log").then(({ data }) => setLogs(data.log)).catch(() => setLogs([])), []);
+  useRefreshOn(load);
+  if (logs === null) return <div className="flex justify-center py-16"><Loader2 className="animate-spin text-[#0030cf]" /></div>;
+  if (logs.length === 0) return <p className="text-center text-slate-400 py-12">No manual profit has been added yet.</p>;
+  const totalAdded = logs.reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
+  return (
+    <div className="space-y-2" data-testid="admin-profit-log">
+      <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm shadow-sm">
+        <span className="text-slate-500">Total manual profit applied</span>
+        <span className={`font-mono font-bold ${totalAdded >= 0 ? "text-emerald-600" : "text-red-600"}`}>{totalAdded >= 0 ? "+" : ""}{fmtXRP(totalAdded)} XRP</span>
+      </div>
+      {logs.map((l) => {
+        const amt = Number(l.amount) || 0;
+        const positive = amt >= 0;
+        return (
+          <div key={l.id} className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm shadow-sm" data-testid={`profit-log-row-${l.id}`}>
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${positive ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"}`}>
+              {positive ? <Plus size={15} /> : <Minus size={15} />}
+            </div>
+            <div className="min-w-0">
+              <p className="text-slate-900 font-medium truncate">{l.user_name}{l.user_email ? <span className="text-slate-400 font-normal"> · {l.user_email}</span> : null}</p>
+              <p className="text-xs text-slate-400">by <b className="text-slate-600">{l.admin_username}</b> · {fmtDate(l.created_at)}</p>
+            </div>
+            <span className={`ml-auto font-mono font-bold tabular-nums ${positive ? "text-emerald-600" : "text-red-600"}`}>{positive ? "+" : ""}{fmtXRP(amt)} XRP</span>
+          </div>
+        );
+      })}
     </div>
   );
 }

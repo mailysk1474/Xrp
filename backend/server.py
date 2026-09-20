@@ -335,6 +335,8 @@ def serialize_stake(stake: dict, now: datetime, vault: dict = None) -> dict:
         if stake.get("duration_days", 0) else None,
         "status": status,
         "accrued": round(net, 6),
+        "profit_at_maturity": round(principal * stake["apy"], 6),
+        "total_at_maturity": round(principal + principal * stake["apy"], 6),
         "claimed_profit": round(claimed, 6),
         "tier": stake.get("tier", "flex"),
         "can_exit": can_exit,
@@ -1246,6 +1248,36 @@ async def admin_audit_log(admin: dict = Depends(require_admin)):
         "id": str(l["_id"]), "admin_username": l.get("admin_username"), "action": l["action"],
         "target_user": l.get("target_user"), "detail": l.get("detail", {}), "created_at": l["created_at"],
     } for l in logs]}
+
+
+@api.get("/admin/profit-log")
+async def admin_profit_log(admin: dict = Depends(require_admin)):
+    """History of manual profit added/removed by admins (from the audit trail)."""
+    logs = await db.audit_log.find({"action": "adjust_profit"}).sort("created_at", -1).to_list(500)
+    uids = list({l.get("target_user") for l in logs if l.get("target_user")})
+    users = {}
+    for uid in uids:
+        try:
+            u = await db.users.find_one({"_id": ObjectId(uid)})
+            if u:
+                users[uid] = u
+        except Exception:
+            continue
+    out = []
+    for l in logs:
+        uid = l.get("target_user")
+        u = users.get(uid) or {}
+        name = (f"{u.get('first_name', '')} {u.get('last_name', '')}").strip() or u.get("username") or "—"
+        out.append({
+            "id": str(l["_id"]),
+            "admin_username": l.get("admin_username"),
+            "user_id": uid,
+            "user_name": name,
+            "user_email": u.get("email", ""),
+            "amount": (l.get("detail") or {}).get("amount", 0),
+            "created_at": l.get("created_at"),
+        })
+    return {"log": out}
 
 
 @api.put("/admin/vaults/{key}")

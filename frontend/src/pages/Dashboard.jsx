@@ -425,9 +425,23 @@ export default function Dashboard() {
                     </div>
                   </div>
                   {st.duration_days > 0 && st.status !== "matured" && (
-                    <div className="flex items-center justify-between mt-3 px-3 py-2 rounded-xl bg-blue-50 border border-blue-100">
-                      <span className="text-xs text-slate-500 flex items-center gap-1.5"><Clock size={12} /> Unlocks in</span>
-                      <Countdown target={st.matures_at} offsetRef={serverOffset} className="font-mono text-sm font-semibold text-[#0030cf] tabular-nums" testid={`countdown-${st.id}`} />
+                    <div className="mt-3 px-3 py-2.5 rounded-xl bg-blue-50 border border-blue-100">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-slate-500 flex items-center gap-1.5"><Clock size={12} /> Unlocks in</span>
+                        <Countdown target={st.matures_at} offsetRef={serverOffset} className="font-mono text-sm font-semibold text-[#0030cf] tabular-nums" testid={`countdown-${st.id}`} />
+                      </div>
+                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-blue-100">
+                        <span className="text-xs text-slate-500">Profit at maturity</span>
+                        <span className="font-mono text-sm font-semibold text-emerald-600 tabular-nums" data-testid={`maturity-profit-${st.id}`}>
+                          +{fmtXRP(st.profit_at_maturity)} XRP
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between mt-1">
+                        <span className="text-[11px] text-slate-400">Total paid out ≈</span>
+                        <span className="font-mono text-[11px] text-slate-500 tabular-nums" data-testid={`maturity-total-${st.id}`}>
+                          {fmtXRP(st.total_at_maturity)} XRP{rate ? ` · ${xrpToUsdLabel(st.total_at_maturity, rate, 0)}` : ""}
+                        </span>
+                      </div>
                     </div>
                   )}
                   {st.can_exit && !s.user.locked && (
