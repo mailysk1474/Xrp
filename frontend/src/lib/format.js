@@ -55,11 +55,21 @@ export function accrualRatePerSecond(stake) {
 export function liveAccrued(stake, serverOffsetMs = 0) {
   const now = Date.now() + serverOffsetMs;
   const start = new Date(stake.start_at).getTime();
-  let elapsed = (now - start) / 1000;
+  let elapsed = (now - start) / 1000; // seconds
   if (elapsed < 0) elapsed = 0;
   const dur = stake.duration_days || 0;
-  if (dur > 0) elapsed = Math.min(elapsed, dur * 86400);
-  const gross = (stake.principal * stake.apy * elapsed) / (365 * 24 * 3600);
+  const rate = stake.apy || 0;
+  const principal = stake.principal || 0;
+  let gross;
+  if (dur > 0) {
+    // Total-return model: earns the full `apy` return by the end of the lock period.
+    let frac = elapsed / (dur * 86400);
+    if (frac > 1) frac = 1;
+    gross = principal * rate * frac;
+  } else {
+    // Flex (no fixed term): linear daily portion of the total rate.
+    gross = (principal * rate * elapsed) / (365 * 24 * 3600);
+  }
   const net = gross - (stake.claimed_profit || 0);
   return net > 0 ? net : 0;
 }
