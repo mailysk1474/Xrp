@@ -10,7 +10,7 @@ import secrets
 from typing import Dict, Any
 
 # Base URL from frontend/.env
-BASE_URL = "https://e62481f0-4630-4eaa-a790-32b7e6e49bc2.preview.emergentagent.com/api"
+BASE_URL = "https://launch-hub-158.preview.emergentagent.com/api"
 
 # Admin credentials from test_credentials.md
 ADMIN_EMAIL = "admin@xamanprotocol.com"
