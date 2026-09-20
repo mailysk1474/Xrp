@@ -10,7 +10,7 @@ import secrets
 from typing import Dict, Any
 
 # Base URL from frontend/.env
-BASE_URL = "https://launch-hub-158.preview.emergentagent.com/api"
+BASE_URL = "https://570c2f00-c088-4ef7-b39e-16694a7c2da5.preview.emergentagent.com/api"
 
 # Admin credentials from test_credentials.md
 ADMIN_EMAIL = "admin@xamanprotocol.com"
@@ -1498,10 +1498,511 @@ class TestTotalReturnModel:
             return False
 
 
+class TestAdminHotWalletSettings:
+    """Test admin-editable hot wallet address (settings)"""
+    def __init__(self):
+        self.admin_token = None
+        self.user_token = None
+        self.user_id = None
+        self.original_hot_wallet = None
+        
+    def setup_admin_token(self):
+        """Get admin token"""
+        log("\n=== SETUP: Admin Login ===")
+        resp = requests.post(f"{BASE_URL}/auth/login", json={
+            "email": ADMIN_EMAIL,
+            "password": ADMIN_PASSWORD
+        })
+        assert_eq(resp.status_code, 200, "Admin login")
+        self.admin_token = resp.json()["token"]
+        log(f"✓ Admin token obtained")
+        
+    def setup_user_token(self):
+        """Register a regular user for auth guard tests"""
+        log("\n=== SETUP: Register Regular User ===")
+        random_suffix = secrets.token_hex(4)
+        user_email = f"hotwallet_{random_suffix}@example.com"
+        
+        resp = requests.post(f"{BASE_URL}/auth/register", json={
+            "first_name": "Hot",
+            "last_name": "Wallet",
+            "email": user_email,
+            "password": "secret123"
+        })
+        
+        assert_eq(resp.status_code, 200, "User registration")
+        data = resp.json()
+        self.user_token = data["token"]
+        self.user_id = data["user"]["id"]
+        log(f"✓ User registered: email={user_email}, id={self.user_id}")
+        
+    def case_1_get_hot_wallet_settings(self):
+        """Case 1: GET /api/admin/settings with admin token -> 200 with {hot_wallet_address}"""
+        log("\n=== CASE 1: GET /api/admin/settings ===")
+        
+        resp = requests.get(
+            f"{BASE_URL}/admin/settings",
+            headers={"Authorization": f"Bearer {self.admin_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "GET /api/admin/settings returns 200")
+        data = resp.json()
+        
+        assert_in("hot_wallet_address", data, "Response has hot_wallet_address")
+        hot_wallet = data["hot_wallet_address"]
+        
+        # Verify it's a valid XRP address (starts with 'r')
+        assert_true(hot_wallet.startswith("r"), f"hot_wallet_address starts with 'r': {hot_wallet}")
+        assert_true(len(hot_wallet) >= 25 and len(hot_wallet) <= 35, 
+                   f"hot_wallet_address length is 25-35 chars: {len(hot_wallet)}")
+        
+        # Store original for restoration later
+        self.original_hot_wallet = hot_wallet
+        log(f"✓ Current hot_wallet_address: {hot_wallet}")
+        
+    def case_2_update_hot_wallet_valid(self):
+        """Case 2: PUT /api/admin/settings with valid XRP address -> 200"""
+        log("\n=== CASE 2: PUT /api/admin/settings with Valid Address ===")
+        
+        new_address = "rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4"
+        
+        resp = requests.put(
+            f"{BASE_URL}/admin/settings",
+            json={"hot_wallet_address": new_address},
+            headers={"Authorization": f"Bearer {self.admin_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "PUT /api/admin/settings returns 200")
+        data = resp.json()
+        
+        assert_eq(data.get("ok"), True, "Response ok is true")
+        assert_eq(data.get("hot_wallet_address"), new_address, "Response hot_wallet_address matches")
+        
+        log(f"✓ Hot wallet updated to: {new_address}")
+        
+    def case_3_verify_deposit_info_reflects_new_address(self):
+        """Case 3: GET /api/deposit-info returns new address"""
+        log("\n=== CASE 3: Verify GET /api/deposit-info Reflects New Address ===")
+        
+        # Use user token (any authenticated user can call this)
+        resp = requests.get(
+            f"{BASE_URL}/deposit-info",
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "GET /api/deposit-info returns 200")
+        data = resp.json()
+        
+        assert_in("address", data, "Response has address")
+        address = data["address"]
+        
+        assert_eq(address, "rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4", 
+                 "deposit-info address matches updated hot wallet")
+        
+        log(f"✓ GET /api/deposit-info address: {address}")
+        
+    def case_4_verify_state_reflects_new_address(self):
+        """Case 4: GET /api/state returns new hot_wallet"""
+        log("\n=== CASE 4: Verify GET /api/state Reflects New Address ===")
+        
+        # Use user token (any authenticated user can call this)
+        resp = requests.get(
+            f"{BASE_URL}/state",
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "GET /api/state returns 200")
+        data = resp.json()
+        
+        assert_in("hot_wallet", data, "Response has hot_wallet")
+        hot_wallet = data["hot_wallet"]
+        
+        assert_eq(hot_wallet, "rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4", 
+                 "state hot_wallet matches updated address")
+        
+        log(f"✓ GET /api/state hot_wallet: {hot_wallet}")
+        
+    def case_5_update_invalid_address_hello(self):
+        """Case 5: PUT /api/admin/settings with invalid address 'hello' -> 400"""
+        log("\n=== CASE 5: PUT with Invalid Address 'hello' ===")
+        
+        resp = requests.put(
+            f"{BASE_URL}/admin/settings",
+            json={"hot_wallet_address": "hello"},
+            headers={"Authorization": f"Bearer {self.admin_token}"}
+        )
+        
+        assert_eq(resp.status_code, 400, "Invalid address 'hello' returns 400")
+        detail = resp.json().get("detail", "")
+        log(f"✓ Correctly rejected invalid address: {detail}")
+        
+    def case_6_update_empty_address(self):
+        """Case 6: PUT /api/admin/settings with empty address -> 400"""
+        log("\n=== CASE 6: PUT with Empty Address ===")
+        
+        resp = requests.put(
+            f"{BASE_URL}/admin/settings",
+            json={"hot_wallet_address": ""},
+            headers={"Authorization": f"Bearer {self.admin_token}"}
+        )
+        
+        assert_eq(resp.status_code, 400, "Empty address returns 400")
+        detail = resp.json().get("detail", "")
+        log(f"✓ Correctly rejected empty address: {detail}")
+        
+    def case_7_get_settings_no_auth(self):
+        """Case 7: GET /api/admin/settings without Authorization -> 401/403"""
+        log("\n=== CASE 7: GET /api/admin/settings Without Auth ===")
+        
+        resp = requests.get(f"{BASE_URL}/admin/settings")
+        
+        assert_true(resp.status_code in [401, 403], 
+                   f"Without auth returns 401/403 (got {resp.status_code})")
+        log(f"✓ Correctly rejected request without auth: {resp.status_code}")
+        
+    def case_8_put_settings_no_auth(self):
+        """Case 8: PUT /api/admin/settings without Authorization -> 401/403"""
+        log("\n=== CASE 8: PUT /api/admin/settings Without Auth ===")
+        
+        resp = requests.put(
+            f"{BASE_URL}/admin/settings",
+            json={"hot_wallet_address": "rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4"}
+        )
+        
+        assert_true(resp.status_code in [401, 403], 
+                   f"Without auth returns 401/403 (got {resp.status_code})")
+        log(f"✓ Correctly rejected request without auth: {resp.status_code}")
+        
+    def case_9_get_settings_non_admin(self):
+        """Case 9: GET /api/admin/settings with non-admin token -> 403"""
+        log("\n=== CASE 9: GET /api/admin/settings with Non-Admin Token ===")
+        
+        resp = requests.get(
+            f"{BASE_URL}/admin/settings",
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 403, "Non-admin user gets 403")
+        log(f"✓ Correctly rejected non-admin user: {resp.json().get('detail', '')}")
+        
+    def case_10_put_settings_non_admin(self):
+        """Case 10: PUT /api/admin/settings with non-admin token -> 403"""
+        log("\n=== CASE 10: PUT /api/admin/settings with Non-Admin Token ===")
+        
+        resp = requests.put(
+            f"{BASE_URL}/admin/settings",
+            json={"hot_wallet_address": "rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4"},
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 403, "Non-admin user gets 403")
+        log(f"✓ Correctly rejected non-admin user: {resp.json().get('detail', '')}")
+        
+    def case_11_restore_hot_wallet(self):
+        """Case 11: Restore hot wallet to production value"""
+        log("\n=== CASE 11: Restore Hot Wallet to Production Value ===")
+        
+        # Restore to the intended production value
+        production_address = "rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4"
+        
+        resp = requests.put(
+            f"{BASE_URL}/admin/settings",
+            json={"hot_wallet_address": production_address},
+            headers={"Authorization": f"Bearer {self.admin_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "Restore hot wallet returns 200")
+        log(f"✓ Hot wallet restored to production value: {production_address}")
+        
+    def run_all_tests(self):
+        """Run all test cases"""
+        try:
+            self.setup_admin_token()
+            self.setup_user_token()
+            self.case_1_get_hot_wallet_settings()
+            self.case_2_update_hot_wallet_valid()
+            self.case_3_verify_deposit_info_reflects_new_address()
+            self.case_4_verify_state_reflects_new_address()
+            self.case_5_update_invalid_address_hello()
+            self.case_6_update_empty_address()
+            self.case_7_get_settings_no_auth()
+            self.case_8_put_settings_no_auth()
+            self.case_9_get_settings_non_admin()
+            self.case_10_put_settings_non_admin()
+            self.case_11_restore_hot_wallet()
+            
+            log("\n" + "="*60)
+            log("✅ ALL 11 ADMIN HOT WALLET SETTINGS TEST CASES PASSED")
+            log("="*60)
+            return True
+            
+        except AssertionError as e:
+            log(f"\n❌ TEST FAILED: {e}")
+            return False
+        except Exception as e:
+            log(f"\n❌ UNEXPECTED ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+
+class TestWithdrawalAddressTag:
+    """Test withdrawal with destination address + optional tag"""
+    def __init__(self):
+        self.admin_token = None
+        self.user_token = None
+        self.user_id = None
+        self.user_email = None
+        
+    def setup_admin_token(self):
+        """Get admin token"""
+        log("\n=== SETUP: Admin Login ===")
+        resp = requests.post(f"{BASE_URL}/auth/login", json={
+            "email": ADMIN_EMAIL,
+            "password": ADMIN_PASSWORD
+        })
+        assert_eq(resp.status_code, 200, "Admin login")
+        self.admin_token = resp.json()["token"]
+        log(f"✓ Admin token obtained")
+        
+    def case_1_register_and_fund_user(self):
+        """Case 1: Register fresh user and admin credits balance"""
+        log("\n=== CASE 1: Register and Fund User ===")
+        
+        # Register user
+        random_suffix = secrets.token_hex(4)
+        self.user_email = f"withdraw_{random_suffix}@example.com"
+        
+        resp = requests.post(f"{BASE_URL}/auth/register", json={
+            "first_name": "Withdraw",
+            "last_name": "Tester",
+            "email": self.user_email,
+            "password": "secret123"
+        })
+        
+        assert_eq(resp.status_code, 200, "User registration")
+        data = resp.json()
+        self.user_token = data["token"]
+        self.user_id = data["user"]["id"]
+        log(f"✓ User registered: email={self.user_email}, id={self.user_id}")
+        
+        # Get user list to confirm user_id
+        resp = requests.get(
+            f"{BASE_URL}/admin/users",
+            headers={"Authorization": f"Bearer {self.admin_token}"}
+        )
+        assert_eq(resp.status_code, 200, "GET /api/admin/users")
+        users = resp.json().get("users", [])
+        user_found = any(u["id"] == self.user_id for u in users)
+        assert_true(user_found, f"User {self.user_id} found in admin users list")
+        log(f"✓ User confirmed in admin users list")
+        
+        # Admin credits balance with 1000 XRP
+        resp = requests.post(
+            f"{BASE_URL}/admin/users/{self.user_id}/adjust-balance",
+            json={"amount": 1000},
+            headers={"Authorization": f"Bearer {self.admin_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "Admin balance credit")
+        log(f"✓ Balance credited: 1000 XRP")
+        
+    def case_2_withdraw_with_address_and_tag(self):
+        """Case 2: POST /api/withdraw with address + tag -> 200, balance decremented"""
+        log("\n=== CASE 2: Withdraw with Address and Tag ===")
+        
+        # Get initial balance
+        resp = requests.get(
+            f"{BASE_URL}/state",
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        assert_eq(resp.status_code, 200, "GET /api/state")
+        initial_balance = resp.json().get("balance", 0)
+        log(f"Initial balance: {initial_balance} XRP")
+        
+        # Withdraw 10 XRP with address and tag
+        resp = requests.post(
+            f"{BASE_URL}/withdraw",
+            json={
+                "amount": 10,
+                "address": "rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4",
+                "tag": "12345"
+            },
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "POST /api/withdraw returns 200")
+        data = resp.json()
+        assert_eq(data.get("ok"), True, "Response ok is true")
+        assert_in("transaction_id", data, "Response has transaction_id")
+        
+        log(f"✓ Withdrawal successful: transaction_id={data['transaction_id']}")
+        
+        # Verify balance decremented by 10
+        resp = requests.get(
+            f"{BASE_URL}/state",
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        assert_eq(resp.status_code, 200, "GET /api/state")
+        new_balance = resp.json().get("balance", 0)
+        
+        expected_balance = initial_balance - 10
+        assert_true(abs(new_balance - expected_balance) < 0.01,
+                   f"Balance decremented: {initial_balance} - 10 = {new_balance} (expected {expected_balance})")
+        log(f"✓ Balance decremented: {initial_balance} -> {new_balance} XRP")
+        
+    def case_3_verify_withdrawal_in_admin_queue(self):
+        """Case 3: GET /api/admin/withdrawals shows destination_address and destination_tag"""
+        log("\n=== CASE 3: Verify Withdrawal in Admin Queue ===")
+        
+        resp = requests.get(
+            f"{BASE_URL}/admin/withdrawals",
+            headers={"Authorization": f"Bearer {self.admin_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "GET /api/admin/withdrawals returns 200")
+        data = resp.json()
+        
+        assert_in("withdrawals", data, "Response has withdrawals")
+        withdrawals = data["withdrawals"]
+        
+        # Find withdrawal for this user
+        user_withdrawal = None
+        for w in withdrawals:
+            if w.get("user_id") == self.user_id:
+                user_withdrawal = w
+                break
+        
+        assert_true(user_withdrawal is not None, f"Found withdrawal for user {self.user_id}")
+        
+        # Verify destination_address and destination_tag
+        assert_eq(user_withdrawal.get("destination_address"), "rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4",
+                 "destination_address matches")
+        assert_eq(user_withdrawal.get("destination_tag"), "12345",
+                 "destination_tag matches")
+        assert_eq(user_withdrawal.get("amount"), 10,
+                 "amount matches")
+        
+        log(f"✓ Withdrawal in admin queue: destination_address={user_withdrawal['destination_address']}, destination_tag={user_withdrawal['destination_tag']}, amount={user_withdrawal['amount']}")
+        
+    def case_4_withdraw_missing_address(self):
+        """Case 4: POST /api/withdraw with missing address -> 400/422"""
+        log("\n=== CASE 4: Withdraw with Missing Address ===")
+        
+        resp = requests.post(
+            f"{BASE_URL}/withdraw",
+            json={"amount": 5},
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_true(resp.status_code in [400, 422], 
+                   f"Missing address returns 400/422 (got {resp.status_code})")
+        detail = resp.json().get("detail", "")
+        log(f"✓ Correctly rejected missing address: {resp.status_code} - {detail}")
+        
+    def case_5_withdraw_invalid_address(self):
+        """Case 5: POST /api/withdraw with invalid address 'hello' -> 400"""
+        log("\n=== CASE 5: Withdraw with Invalid Address ===")
+        
+        resp = requests.post(
+            f"{BASE_URL}/withdraw",
+            json={"amount": 5, "address": "hello"},
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 400, "Invalid address returns 400")
+        detail = resp.json().get("detail", "")
+        assert_in("valid", detail.lower(), "Error message mentions 'valid'")
+        log(f"✓ Correctly rejected invalid address: {detail}")
+        
+    def case_6_withdraw_non_numeric_tag(self):
+        """Case 6: POST /api/withdraw with non-numeric tag 'abc' -> 400"""
+        log("\n=== CASE 6: Withdraw with Non-Numeric Tag ===")
+        
+        resp = requests.post(
+            f"{BASE_URL}/withdraw",
+            json={
+                "amount": 5,
+                "address": "rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4",
+                "tag": "abc"
+            },
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 400, "Non-numeric tag returns 400")
+        detail = resp.json().get("detail", "")
+        assert_in("number", detail.lower(), "Error message mentions 'number'")
+        log(f"✓ Correctly rejected non-numeric tag: {detail}")
+        
+    def case_7_withdraw_amount_greater_than_balance(self):
+        """Case 7: POST /api/withdraw with amount > balance -> 400"""
+        log("\n=== CASE 7: Withdraw Amount Greater Than Balance ===")
+        
+        # Get current balance
+        resp = requests.get(
+            f"{BASE_URL}/state",
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        assert_eq(resp.status_code, 200, "GET /api/state")
+        balance = resp.json().get("balance", 0)
+        log(f"Current balance: {balance} XRP")
+        
+        # Try to withdraw more than balance
+        excessive_amount = balance + 100
+        
+        resp = requests.post(
+            f"{BASE_URL}/withdraw",
+            json={
+                "amount": excessive_amount,
+                "address": "rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4"
+            },
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 400, "Amount > balance returns 400")
+        detail = resp.json().get("detail", "")
+        assert_in("insufficient", detail.lower(), "Error message mentions 'insufficient'")
+        log(f"✓ Correctly rejected amount > balance: {detail}")
+        
+    def run_all_tests(self):
+        """Run all test cases"""
+        try:
+            self.setup_admin_token()
+            self.case_1_register_and_fund_user()
+            self.case_2_withdraw_with_address_and_tag()
+            self.case_3_verify_withdrawal_in_admin_queue()
+            self.case_4_withdraw_missing_address()
+            self.case_5_withdraw_invalid_address()
+            self.case_6_withdraw_non_numeric_tag()
+            self.case_7_withdraw_amount_greater_than_balance()
+            
+            log("\n" + "="*60)
+            log("✅ ALL 7 WITHDRAWAL ADDRESS+TAG TEST CASES PASSED")
+            log("="*60)
+            return True
+            
+        except AssertionError as e:
+            log(f"\n❌ TEST FAILED: {e}")
+            return False
+        except Exception as e:
+            log(f"\n❌ UNEXPECTED ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+
 if __name__ == "__main__":
     import sys
     
-    if len(sys.argv) > 1 and sys.argv[1] == "totalreturn":
+    if len(sys.argv) > 1 and sys.argv[1] == "hotwallet":
+        # Run admin hot wallet settings tests
+        tester = TestAdminHotWalletSettings()
+        success = tester.run_all_tests()
+    elif len(sys.argv) > 1 and sys.argv[1] == "withdraw":
+        # Run withdrawal address+tag tests
+        tester = TestWithdrawalAddressTag()
+        success = tester.run_all_tests()
+    elif len(sys.argv) > 1 and sys.argv[1] == "totalreturn":
         # Run total-return model tests
         tester = TestTotalReturnModel()
         success = tester.run_all_tests()

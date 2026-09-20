@@ -48,6 +48,7 @@ export default function Admin() {
             <TabsTrigger value="vaults" data-testid="admin-tab-vaults" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg text-slate-600"><Layers size={15} className="mr-1.5" /> Vaults</TabsTrigger>
             <TabsTrigger value="profit" data-testid="admin-tab-profit" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg text-slate-600"><TrendingUp size={15} className="mr-1.5" /> Profit Log</TabsTrigger>
             <TabsTrigger value="audit" data-testid="admin-tab-audit" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg text-slate-600"><ScrollText size={15} className="mr-1.5" /> Audit</TabsTrigger>
+            <TabsTrigger value="settings" data-testid="admin-tab-settings" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg text-slate-600"><Wallet size={15} className="mr-1.5" /> Settings</TabsTrigger>
           </TabsList>
           <TabsContent value="users" className="mt-5"><UsersTab /></TabsContent>
           <TabsContent value="deposits" className="mt-5"><DepositsTab /></TabsContent>
@@ -55,6 +56,7 @@ export default function Admin() {
           <TabsContent value="vaults" className="mt-5"><VaultsTab /></TabsContent>
           <TabsContent value="profit" className="mt-5"><ProfitLogTab /></TabsContent>
           <TabsContent value="audit" className="mt-5"><AuditTab /></TabsContent>
+          <TabsContent value="settings" className="mt-5"><SettingsTab /></TabsContent>
         </Tabs>
       </main>
     </div>
@@ -323,7 +325,7 @@ function WithdrawalsTab() {
     try { await api.post(`/admin/withdrawals/${id}/${action}`); toast.success(action === "approve" ? "Withdrawal approved." : "Withdrawal rejected & refunded."); load(); }
     catch (e) { toast.error(apiError(e)); }
   };
-  return <Queue items={items} empty="No pending withdrawals." testidPrefix="withdrawal" onConfirm={(id) => act(id, "approve")} onReject={(id) => act(id, "reject")} confirmLabel="Approve" />;
+  return <Queue items={items} empty="No pending withdrawals." testidPrefix="withdrawal" onConfirm={(id) => act(id, "approve")} onReject={(id) => act(id, "reject")} confirmLabel="Approve" showTag />;
 }
 
 function Queue({ items, empty, onConfirm, onReject, confirmLabel, testidPrefix, showTag }) {
@@ -336,6 +338,11 @@ function Queue({ items, empty, onConfirm, onReject, confirmLabel, testidPrefix, 
           <div className="flex-1 min-w-0">
             <p className="text-slate-900 font-medium">@{it.username}</p>
             <p className="text-xs text-slate-400">{fmtDate(it.created_at)}{showTag && it.destination_tag ? ` · tag ${it.destination_tag}` : ""}</p>
+            {it.destination_address ? (
+              <p className="text-xs text-slate-500 font-mono break-all mt-0.5" data-testid={`${testidPrefix}-dest-${it.id}`}>
+                <span className="text-slate-400">To:</span> {it.destination_address}
+              </p>
+            ) : null}
           </div>
           <p className="font-mono font-semibold text-slate-900">{fmtXRP(it.amount)} XRP</p>
           <div className="flex gap-2">
@@ -480,6 +487,93 @@ function VaultsTab() {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+
+function SettingsTab() {
+  const [current, setCurrent] = useState(null);
+  const [value, setValue] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(() => {
+    api.get("/admin/settings").then(({ data }) => {
+      setCurrent(data.hot_wallet_address || "");
+      setValue((prev) => (prev ? prev : (data.hot_wallet_address || "")));
+    }).catch((e) => { setCurrent(""); toast.error(apiError(e)); });
+  }, []);
+  useRefreshOn(load);
+
+  const XRP_RE = /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/;
+  const trimmed = value.trim();
+  const valid = XRP_RE.test(trimmed);
+  const changed = trimmed !== (current || "");
+
+  const save = async () => {
+    if (!valid) return toast.error("Enter a valid XRP address (starts with 'r', 25–35 chars).");
+    setSaving(true);
+    try {
+      const { data } = await api.put("/admin/settings", { hot_wallet_address: trimmed });
+      setCurrent(data.hot_wallet_address);
+      setValue(data.hot_wallet_address);
+      toast.success("Hot wallet updated — applied to all members instantly.");
+    } catch (err) {
+      toast.error(apiError(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (current === null) return <div className="flex justify-center py-16"><Loader2 className="animate-spin text-[#0030cf]" /></div>;
+
+  return (
+    <div className="space-y-3" data-testid="admin-settings">
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm max-w-2xl">
+        <div className="flex items-center gap-3 mb-1">
+          <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#0030cf]"><Wallet size={18} /></div>
+          <div>
+            <p className="font-semibold text-slate-900">Deposit Hot Wallet</p>
+            <p className="text-xs text-slate-400">The shared XRP address every member sends deposits to. Members are identified by their unique destination tag.</p>
+          </div>
+        </div>
+
+        <div className="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-[#0030cf]">Current address</p>
+          <p className="font-mono text-sm text-slate-900 break-all mt-1" data-testid="settings-current-wallet">{current || "—"}</p>
+        </div>
+
+        <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mt-4 mb-1">New XRP address</label>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          spellCheck={false}
+          data-testid="settings-wallet-input"
+          placeholder="rXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+          className={`w-full bg-slate-50 border rounded-lg px-3 py-2.5 font-mono text-sm outline-none transition-colors ${trimmed && !valid ? "border-red-400 focus:border-red-500" : "border-slate-300 focus:border-blue-500"}`}
+        />
+        {trimmed && !valid && (
+          <p className="text-xs text-red-500 mt-1.5 flex items-center gap-1"><X size={13} /> Not a valid XRP address (must start with {"'r'"}).</p>
+        )}
+
+        <div className="flex items-center gap-3 mt-4">
+          <button
+            onClick={save}
+            disabled={saving || !valid || !changed}
+            data-testid="settings-save-wallet"
+            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
+          >
+            {saving ? <Loader2 className="animate-spin" size={15} /> : <Check size={15} />} Update Hot Wallet
+          </button>
+          {changed && valid && <span className="text-xs text-amber-600 font-medium">Unsaved change</span>}
+        </div>
+
+        <div className="mt-4 flex items-start gap-2 text-xs text-slate-500 bg-blue-50/60 border border-blue-100 rounded-xl p-3">
+          <Clock size={14} className="text-[#0030cf] mt-0.5 shrink-0" />
+          <span>Once saved, every connected member sees the new deposit address immediately — no re-login or refresh needed.</span>
+        </div>
+      </div>
     </div>
   );
 }

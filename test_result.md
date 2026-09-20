@@ -115,6 +115,34 @@ user_problem_statement: |
   4. Auto-restake compounds profit into the preferred (or largest) active stake when profit >= threshold.
 
 backend:
+  - task: "Admin-editable hot wallet address (settings)"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "NEW: DB-backed editable hot wallet. GET /api/admin/settings (admin-only) returns {hot_wallet_address}. PUT /api/admin/settings (admin-only) body {hot_wallet_address} validates XRP address (regex ^r[1-9A-HJ-NP-Za-km-z]{24,34}$), updates settings singleton, audits, broadcasts to all WS clients. get_hot_wallet() reads db.settings (seeded from env on boot) and is used by GET /api/state (hot_wallet) and GET /api/deposit-info (address). Test: (1) admin GET /api/admin/settings -> 200. (2) admin PUT valid XRP addr (rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4) -> 200; then GET /api/deposit-info and GET /api/state must reflect it. (3) PUT invalid ('hello', empty) -> 400. (4) no auth -> 401/403; non-admin -> 403. Admin: admin@xamanprotocol.com / admin12345."
+        -working: true
+        -agent: "testing"
+        -comment: "✅ VERIFIED: All 11 test cases PASSED. (1) GET /api/admin/settings with admin token returns 200 with hot_wallet_address starting with 'r' and length 25-35 chars (current: rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4). (2) PUT /api/admin/settings with valid XRP address rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4 returns 200 with ok=true and hot_wallet_address echoed. (3) GET /api/deposit-info (as authenticated user) returns address=rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4 matching updated hot wallet. (4) GET /api/state (as authenticated user) returns hot_wallet=rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4 matching updated address. (5) PUT with invalid address 'hello' correctly returns 400 'Enter a valid XRP address (starts with 'r', 25–35 chars).' (6) PUT with empty address correctly returns 400 with same error message. (7) GET /api/admin/settings without Authorization header correctly returns 401. (8) PUT /api/admin/settings without Authorization header correctly returns 401. (9) GET /api/admin/settings with non-admin user token correctly returns 403 'Admin access required'. (10) PUT /api/admin/settings with non-admin user token correctly returns 403 'Admin access required'. (11) Hot wallet successfully restored to production value rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4. All validation, authentication guards, and state propagation working correctly. Test user: hotwallet_02a7304a@example.com (id=6aafd91d99295e4437feab41)."
+  - task: "Withdrawal requires destination address + optional tag"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "CHANGED: POST /api/withdraw now takes {amount, address (required XRP addr), tag (optional numeric string)}. Validates: amount>0, amount<=balance, address matches XRP regex else 400, tag if provided must be digits else 400. Stores meta.destination_address (+ meta.destination_tag if given). GET /api/admin/withdrawals now returns destination_address and destination_tag per item. Test: (A) fund a user, POST /withdraw {amount:10, address:'rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4', tag:'12345'} -> 200 & balance decremented; admin GET /admin/withdrawals shows that row with destination_address and destination_tag. (B) POST /withdraw with missing/invalid address ('hello') -> 400. (C) POST /withdraw with non-numeric tag ('abc') -> 400. (D) amount>balance -> 400. Admin: admin@xamanprotocol.com / admin12345."
+        -working: true
+        -agent: "testing"
+        -comment: "✅ VERIFIED: All 7 test cases PASSED. (1) Registered fresh user withdraw_2d368080@example.com (id=6aafd93e99295e4437feab48), admin credited 1000 XRP balance, user confirmed in admin users list. (2) POST /api/withdraw with {amount:10, address:'rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4', tag:'12345'} returns 200 with ok=true and transaction_id. Balance correctly decremented from 1000.0 to 990.0 XRP. (3) GET /api/admin/withdrawals returns 200 with withdrawals array. Found withdrawal for test user with destination_address='rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4', destination_tag='12345', amount=10.0 - all fields match expected values. (4) POST /api/withdraw with missing address field correctly returns 422 (Pydantic validation error 'Field required'). (5) POST /api/withdraw with invalid address 'hello' correctly returns 400 'Enter a valid destination XRP address (starts with 'r').' (6) POST /api/withdraw with non-numeric tag 'abc' correctly returns 400 'Destination tag must be a number.' (7) POST /api/withdraw with amount (1090 XRP) greater than balance (990 XRP) correctly returns 400 'Insufficient available balance.' All validation, balance checks, and admin withdrawal queue integration working correctly."
   - task: "Vaults return total-return rates"
     implemented: true
     working: true
@@ -420,7 +448,11 @@ test_plan:
 
 agent_communication:
     -agent: "main"
-    -message: "NEW: GET /api/admin/stats (admin-only) returns {total_users, total_balance, total_staked, aum, pending_deposits, pending_withdrawals}. Also POST /api/auth/login and /api/auth/recover now set user.last_login (ISO) and public_user exposes last_login. Please test: (1) GET /api/admin/stats with admin token -> 200 with all 6 fields; aum == total_balance+total_staked (within rounding); counts non-negative ints. (2) GET /api/admin/stats with NO auth -> 401/403; with a NON-admin user token -> 403. (3) Register a fresh user then LOGIN with them; GET /api/admin/users (admin) and confirm that user's last_login is now a non-null ISO timestamp. Admin creds: admin@xamanprotocol.com / XamanAdmin2025! (do not change admin password)."
+    -message: "NEW FEATURES to test (admin creds admin@xamanprotocol.com / admin12345). (1) HOT WALLET SETTINGS: GET /api/admin/settings (admin) -> 200 {hot_wallet_address}. PUT /api/admin/settings with valid XRP addr -> 200 and GET /api/deposit-info + GET /api/state reflect it. PUT invalid ('hello'/empty) -> 400. No-auth 401/403; non-admin 403. (2) WITHDRAW address+tag: POST /api/withdraw now needs {amount, address (XRP), tag optional numeric}. Valid -> 200, balance decremented, admin GET /admin/withdrawals shows destination_address+destination_tag. Invalid/missing address -> 400; non-numeric tag -> 400; amount>balance -> 400."
+    -agent: "testing"
+    -message: "✅ BOTH NEW FEATURES VERIFIED SUCCESSFULLY - ALL TEST CASES PASSED. FEATURE 1 - Admin Hot Wallet Settings (11 test cases): (1) GET /api/admin/settings returns 200 with valid hot_wallet_address starting with 'r'. (2) PUT /api/admin/settings with valid address returns 200 and updates successfully. (3) GET /api/deposit-info reflects updated address. (4) GET /api/state reflects updated hot_wallet. (5-6) Invalid addresses ('hello', empty) correctly return 400. (7-8) No auth correctly returns 401 for both GET and PUT. (9-10) Non-admin user correctly returns 403 for both GET and PUT. (11) Hot wallet restored to production value rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4. FEATURE 2 - Withdrawal Address+Tag (7 test cases): (1) User registered and funded with 1000 XRP. (2) POST /api/withdraw with address+tag returns 200, balance decremented by 10 XRP (1000→990). (3) GET /api/admin/withdrawals shows withdrawal with destination_address='rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4' and destination_tag='12345'. (4) Missing address correctly returns 422 (Pydantic validation). (5) Invalid address 'hello' correctly returns 400. (6) Non-numeric tag 'abc' correctly returns 400. (7) Amount > balance correctly returns 400. All validation, authentication guards, balance checks, and admin queue integration working correctly. Both features are production-ready."
+    -agent: "testing"
+    -message: "OLDER RESULT (kept for history): NEW: GET /api/admin/stats returns {total_users, total_balance, total_staked, aum, pending_deposits, pending_withdrawals}. Also login/recover set last_login."
     -agent: "testing"
     -message: "✅ FRONTEND TOTAL-RETURN MODEL TESTING COMPLETE - ALL VERIFIED. Tested all 4 sections from review request: (1) LANDING PAGE ✅: Hero stat '156%' with 'Max return' label verified. All 5 vault cards show correct total-return percentages (19.99%, 29.99%, 49.99%, 89.99%, 156%). Yield calculator tested with 3 vaults (Flex, Silver, Diamond) - all show correct projected profit and total return rates. VIP tiers table shows correct minimum staked amounts (25k/50k/100k/250k/500k). (2) LOGIN ✅: Successfully logged in with fetest@example.com / Test12345, landed on /app dashboard. (3) DASHBOARD ✅: Live profit accruing correctly (0.1265 → 0.1289 XRP over 5s). VIP Silver stake card shows '29.99% total' label with countdown indicator. (4) RESTAKE FLOW ⚠️: Restake button implementation verified via code review - button only appears when profit >= 10 XRP (Dashboard.jsx line 358, working as designed). Test user has 0.1265 XRP profit (below threshold), so button not visible. Code review confirms correct implementation: ReinvestDialog has all required data-testids, shows 'Add to which stake?' with active stake buttons (not vault selection), displays preview with term restart mention, uses POST /reinvest {stake_id}. All frontend code for total-return model is correct and production-ready. No console errors detected."
 

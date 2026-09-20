@@ -38,7 +38,11 @@ export default function Deposit() {
   const locked = serverState?.user?.locked;
 
   useEffect(() => {
-    api.get("/deposit-info").then(({ data }) => setInfo(data)).catch(() => {});
+    const load = () => api.get("/deposit-info").then(({ data }) => setInfo(data)).catch(() => {});
+    load();
+    const h = () => load();
+    window.addEventListener("xp-refresh", h);
+    return () => window.removeEventListener("xp-refresh", h);
   }, []);
 
   const submit = async () => {
@@ -47,7 +51,7 @@ export default function Deposit() {
     setSubmitting(true);
     try {
       await api.post("/deposit-claim", { amount: amt });
-      toast.success("Deposit submitted. Pending admin confirmation.");
+      toast.success("Deposit submitted. Pending confirmation.");
       setAmount("");
       refresh();
     } catch (err) {

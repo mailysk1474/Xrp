@@ -37,6 +37,32 @@ JWT_SECRET = os.environ['JWT_SECRET']
 JWT_ALGO = "HS256"
 HOT_WALLET_ADDRESS = os.environ.get('HOT_WALLET_ADDRESS', 'rXAMANhotwalletXRPplaceholderADDR')
 
+SETTINGS_ID = "global"
+# In-process cache so hot wallet reads never hit the DB on the hot path.
+_settings_cache: Dict[str, Any] = {}
+
+
+async def get_hot_wallet() -> str:
+    """Return the current hot wallet address. DB-backed (admin-editable) with env fallback."""
+    if "hot_wallet_address" in _settings_cache:
+        return _settings_cache["hot_wallet_address"]
+    doc = await db.settings.find_one({"_id": SETTINGS_ID})
+    addr = (doc or {}).get("hot_wallet_address") or HOT_WALLET_ADDRESS
+    _settings_cache["hot_wallet_address"] = addr
+    return addr
+
+
+async def set_hot_wallet(address: str):
+    await db.settings.update_one(
+        {"_id": SETTINGS_ID},
+        {"$set": {"hot_wallet_address": address, "updated_at": now_iso()}},
+        upsert=True,
+    )
+    _settings_cache["hot_wallet_address"] = address
+
+
+XRP_ADDRESS_RE = re.compile(r"^r[1-9A-HJ-NP-Za-km-z]{24,34}$")
+
 mnemo = Mnemonic("english")
 logger = logging.getLogger("xaman")
 logging.basicConfig(level=logging.INFO)
@@ -392,7 +418,7 @@ async def build_state(user: dict) -> dict:
         "tier": tier,
         "tier_info": tier_info,
         "stakes": stakes,
-        "hot_wallet": HOT_WALLET_ADDRESS,
+        "hot_wallet": await get_hot_wallet(),
         "destination_tag": user.get("destination_tag"),
         "server_time": now.isoformat(),
     }
@@ -572,6 +598,12 @@ class AmountReq(BaseModel):
     amount: float
 
 
+class WithdrawReq(BaseModel):
+    amount: float
+    address: str
+    tag: Optional[str] = None
+
+
 class DeltaReq(BaseModel):
     amount: float
 
@@ -592,6 +624,10 @@ class VaultUpdateReq(BaseModel):
     early_exit_fee: Optional[float] = None
     slippage: Optional[float] = None
     enabled: Optional[bool] = None
+
+
+class SettingsReq(BaseModel):
+    hot_wallet_address: str
 
 
 # ---------------------------------------------------------------------------
@@ -711,7 +747,7 @@ def _meta_summary(meta: dict) -> str:
     if not meta:
         return ""
     parts = []
-    for k in ("vault", "kind", "fee_amount", "slippage_amount", "forfeited_profit", "profit_paid", "destination_tag"):
+    for k in ("vault", "kind", "fee_amount", "slippage_amount", "forfeited_profit", "profit_paid", "destination_address", "destination_tag"):
         if k in meta and meta[k] not in (None, ""):
             parts.append(f"{k}={meta[k]}")
     return "; ".join(parts)
@@ -859,7 +895,7 @@ async def get_state(user: dict = Depends(get_current_user)):
 
 @api.get("/deposit-info")
 async def deposit_info(user: dict = Depends(get_current_user)):
-    return {"address": HOT_WALLET_ADDRESS, "destination_tag": user.get("destination_tag"), "coin": "XRP"}
+    return {"address": await get_hot_wallet(), "destination_tag": user.get("destination_tag"), "coin": "XRP"}
 
 
 @api.get("/transactions")
@@ -1030,7 +1066,7 @@ async def deposit_claim(body: AmountReq, user: dict = Depends(require_active_use
 
 
 @api.post("/withdraw")
-async def withdraw(body: AmountReq, user: dict = Depends(require_active_user)):
+async def withdraw(body: WithdrawReq, user: dict = Depends(require_active_user)):
     fresh = await db.users.find_one({"_id": user["_id"]})
     if fresh.get("withdrawals_disabled"):
         raise HTTPException(status_code=403, detail="Withdrawals are currently disabled for your account.")
@@ -1039,8 +1075,17 @@ async def withdraw(body: AmountReq, user: dict = Depends(require_active_user)):
         raise HTTPException(status_code=400, detail="Enter a valid amount.")
     if amount > fresh.get("balance", 0.0) + 1e-9:
         raise HTTPException(status_code=400, detail="Insufficient available balance.")
+    address = (body.address or "").strip()
+    if not XRP_ADDRESS_RE.match(address):
+        raise HTTPException(status_code=400, detail="Enter a valid destination XRP address (starts with 'r').")
+    tag = (body.tag or "").strip()
+    if tag and not tag.isdigit():
+        raise HTTPException(status_code=400, detail="Destination tag must be a number.")
     await db.users.update_one({"_id": user["_id"]}, {"$inc": {"balance": -amount}})
-    tid = await add_transaction(user["_id"], "withdrawal", amount, "pending", {})
+    meta = {"destination_address": address}
+    if tag:
+        meta["destination_tag"] = tag
+    tid = await add_transaction(user["_id"], "withdrawal", amount, "pending", meta)
     await manager.notify_admins()
     await manager.notify_user(str(user["_id"]))
     return {"ok": True, "transaction_id": tid}
@@ -1069,6 +1114,25 @@ async def admin_stats(admin: dict = Depends(require_admin)):
         "pending_deposits": pending_deposits,
         "pending_withdrawals": pending_withdrawals,
     }
+
+
+@api.get("/admin/settings")
+async def admin_get_settings(admin: dict = Depends(require_admin)):
+    return {"hot_wallet_address": await get_hot_wallet()}
+
+
+@api.put("/admin/settings")
+async def admin_update_settings(body: SettingsReq, admin: dict = Depends(require_admin)):
+    addr = (body.hot_wallet_address or "").strip()
+    if not XRP_ADDRESS_RE.match(addr):
+        raise HTTPException(status_code=400, detail="Enter a valid XRP address (starts with 'r', 25–35 chars).")
+    old = await get_hot_wallet()
+    await set_hot_wallet(addr)
+    await audit(admin, "update_hot_wallet", None, {"old": old, "new": addr})
+    # Enforce immediately for every connected client (users + admins).
+    await manager.notify_all({"type": "state_updated"})
+    await manager.notify_admins()
+    return {"ok": True, "hot_wallet_address": addr}
 
 
 @api.get("/admin/users")
@@ -1190,10 +1254,13 @@ async def admin_withdrawal_queue(admin: dict = Depends(require_admin)):
     out = []
     for t in txns:
         u = await db.users.find_one({"_id": ObjectId(t["user_id"])})
+        meta = t.get("meta", {}) or {}
         out.append({
             "id": str(t["_id"]), "amount": t["amount"], "created_at": t["created_at"],
             "username": u.get("username") if u else "?",
             "user_id": t["user_id"],
+            "destination_address": meta.get("destination_address"),
+            "destination_tag": meta.get("destination_tag"),
         })
     return {"withdrawals": out}
 
@@ -1351,6 +1418,16 @@ async def seed():
     await db.users.create_index("username", unique=True)
     await db.users.create_index("email", unique=True, sparse=True)
     await db.users.create_index("destination_tag", unique=True, sparse=True)
+
+    # Seed the editable settings singleton (hot wallet) from env on first boot.
+    existing_settings = await db.settings.find_one({"_id": SETTINGS_ID})
+    if not existing_settings:
+        await db.settings.insert_one({
+            "_id": SETTINGS_ID,
+            "hot_wallet_address": HOT_WALLET_ADDRESS,
+            "updated_at": now_iso(),
+        })
+    _settings_cache.pop("hot_wallet_address", None)  # refresh cache on boot
 
     admin_username = os.environ["ADMIN_USERNAME"].strip().lower()
     admin_phrase = os.environ["ADMIN_PHRASE"].strip()
