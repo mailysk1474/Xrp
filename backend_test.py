@@ -2390,10 +2390,304 @@ class TestWeightedRestake:
             return False
 
 
+class TestAdminDeleteUser:
+    """Test admin delete user account with instant session kick"""
+    def __init__(self):
+        self.admin_token = None
+        self.admin_user_id = None
+        self.test_user_token = None
+        self.test_user_id = None
+        self.test_user_email = None
+        
+    def setup_admin_token(self):
+        """Get admin token and admin user_id"""
+        log("\n=== SETUP: Admin Login ===")
+        resp = requests.post(f"{BASE_URL}/auth/login", json={
+            "email": ADMIN_EMAIL,
+            "password": ADMIN_PASSWORD
+        })
+        assert_eq(resp.status_code, 200, "Admin login")
+        self.admin_token = resp.json()["token"]
+        
+        # Get admin user_id from GET /api/admin/users
+        resp = requests.get(
+            f"{BASE_URL}/admin/users",
+            headers={"Authorization": f"Bearer {self.admin_token}"}
+        )
+        assert_eq(resp.status_code, 200, "GET /api/admin/users")
+        users = resp.json().get("users", [])
+        
+        for u in users:
+            if u.get("role") == "admin" and u.get("email") == ADMIN_EMAIL:
+                self.admin_user_id = u["id"]
+                break
+        
+        assert_true(self.admin_user_id is not None, "Found admin user_id")
+        log(f"✓ Admin token obtained, admin_user_id={self.admin_user_id}")
+        
+    def case_1_register_fresh_user(self):
+        """Case 1: Register a fresh normal user"""
+        log("\n=== CASE 1: Register Fresh Normal User ===")
+        random_suffix = secrets.token_hex(4)
+        self.test_user_email = f"deletetest_{random_suffix}@example.com"
+        
+        resp = requests.post(f"{BASE_URL}/auth/register", json={
+            "first_name": "Delete",
+            "last_name": "Test",
+            "email": self.test_user_email,
+            "password": "testpass123"
+        })
+        
+        assert_eq(resp.status_code, 200, "User registration")
+        data = resp.json()
+        self.test_user_token = data["token"]
+        self.test_user_id = data["user"]["id"]
+        log(f"✓ User registered: email={self.test_user_email}, id={self.test_user_id}")
+        
+    def case_2_create_user_data(self):
+        """Case 2: Admin credits balance and user creates stake"""
+        log("\n=== CASE 2: Create User Data (Balance + Stake) ===")
+        
+        # Admin credits 200000 XRP balance
+        resp = requests.post(
+            f"{BASE_URL}/admin/users/{self.test_user_id}/adjust-balance",
+            json={"amount": 200000},
+            headers={"Authorization": f"Bearer {self.admin_token}"}
+        )
+        assert_eq(resp.status_code, 200, "Admin balance credit")
+        log(f"✓ Balance credited: 200000 XRP")
+        
+        # User creates a stake
+        resp = requests.post(
+            f"{BASE_URL}/stakes",
+            json={"vault_key": "vip_silver", "amount": 150000},
+            headers={"Authorization": f"Bearer {self.test_user_token}"}
+        )
+        assert_eq(resp.status_code, 200, "Stake creation")
+        log(f"✓ Stake created: 150000 XRP in vip_silver")
+        
+    def case_3_delete_user_success(self):
+        """Case 3: Admin DELETE /api/admin/users/{user_id} -> 200 with deleted counts"""
+        log("\n=== CASE 3: Delete User Successfully ===")
+        
+        resp = requests.delete(
+            f"{BASE_URL}/admin/users/{self.test_user_id}",
+            headers={"Authorization": f"Bearer {self.admin_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "DELETE user returns 200")
+        data = resp.json()
+        
+        assert_eq(data["ok"], True, "Response ok is true")
+        assert_in("deleted", data, "Response has deleted")
+        
+        deleted = data["deleted"]
+        assert_in("stakes", deleted, "deleted has stakes count")
+        assert_in("transactions", deleted, "deleted has transactions count")
+        
+        stakes_count = deleted["stakes"]
+        transactions_count = deleted["transactions"]
+        
+        assert_true(isinstance(stakes_count, int), f"stakes count is int (got {type(stakes_count).__name__})")
+        assert_true(isinstance(transactions_count, int), f"transactions count is int (got {type(transactions_count).__name__})")
+        
+        log(f"✓ User deleted successfully: stakes={stakes_count}, transactions={transactions_count}")
+        
+    def case_4_verify_user_gone_from_list(self):
+        """Case 4: GET /api/admin/users no longer lists the deleted user"""
+        log("\n=== CASE 4: Verify User Gone from Admin Users List ===")
+        
+        resp = requests.get(
+            f"{BASE_URL}/admin/users",
+            headers={"Authorization": f"Bearer {self.admin_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "GET /api/admin/users returns 200")
+        users = resp.json().get("users", [])
+        
+        # Verify deleted user is not in the list
+        deleted_user_found = False
+        for u in users:
+            if u.get("email") == self.test_user_email or u.get("id") == self.test_user_id:
+                deleted_user_found = True
+                break
+        
+        assert_true(not deleted_user_found, f"Deleted user {self.test_user_email} is NOT in admin users list")
+        log(f"✓ Deleted user {self.test_user_email} is not in admin users list")
+        
+    def case_5_verify_user_not_found(self):
+        """Case 5: GET /api/admin/users/{user_id} -> 404"""
+        log("\n=== CASE 5: Verify GET User by ID Returns 404 ===")
+        
+        resp = requests.get(
+            f"{BASE_URL}/admin/users/{self.test_user_id}",
+            headers={"Authorization": f"Bearer {self.admin_token}"}
+        )
+        
+        assert_eq(resp.status_code, 404, "GET deleted user returns 404")
+        log(f"✓ GET /api/admin/users/{self.test_user_id} correctly returns 404")
+        
+    def case_6_verify_token_invalid(self):
+        """Case 6: Deleted user's token no longer works (GET /api/state -> 401)"""
+        log("\n=== CASE 6: Verify Deleted User's Token No Longer Works ===")
+        
+        resp = requests.get(
+            f"{BASE_URL}/state",
+            headers={"Authorization": f"Bearer {self.test_user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 401, "Deleted user's token returns 401")
+        log(f"✓ Deleted user's token correctly returns 401 on GET /api/state")
+        
+    def case_7_delete_admin_account(self):
+        """Case 7: Try to delete an ADMIN account -> 400"""
+        log("\n=== CASE 7: Try to Delete Admin Account ===")
+        
+        resp = requests.delete(
+            f"{BASE_URL}/admin/users/{self.admin_user_id}",
+            headers={"Authorization": f"Bearer {self.admin_token}"}
+        )
+        
+        assert_eq(resp.status_code, 400, "Delete admin account returns 400")
+        detail = resp.json().get("detail", "")
+        
+        # Accept either "Admin accounts cannot be deleted." or "You cannot delete your own account."
+        valid_messages = [
+            "admin accounts cannot be deleted",
+            "you cannot delete your own account"
+        ]
+        
+        detail_lower = detail.lower()
+        message_found = any(msg in detail_lower for msg in valid_messages)
+        
+        assert_true(message_found, f"Error message is appropriate: {detail}")
+        log(f"✓ Correctly rejected deleting admin account: {detail}")
+        
+    def case_8_delete_nonexistent_user(self):
+        """Case 8: DELETE /api/admin/users/{invalid_id} -> 404"""
+        log("\n=== CASE 8: Delete Non-existent User ===")
+        
+        # Try with a valid ObjectId format but non-existent
+        fake_id = "507f1f77bcf86cd799439011"
+        resp = requests.delete(
+            f"{BASE_URL}/admin/users/{fake_id}",
+            headers={"Authorization": f"Bearer {self.admin_token}"}
+        )
+        
+        assert_eq(resp.status_code, 404, "Delete non-existent user returns 404")
+        log(f"✓ Correctly returned 404 for non-existent user: {resp.json().get('detail', '')}")
+        
+        # Try with an invalid ID format
+        invalid_id = "nonexistent123"
+        resp = requests.delete(
+            f"{BASE_URL}/admin/users/{invalid_id}",
+            headers={"Authorization": f"Bearer {self.admin_token}"}
+        )
+        
+        assert_eq(resp.status_code, 404, "Delete invalid user ID returns 404")
+        log(f"✓ Correctly returned 404 for invalid user ID: {resp.json().get('detail', '')}")
+        
+    def case_9_delete_without_auth(self):
+        """Case 9: DELETE /api/admin/users/{id} without Authorization -> 401/403"""
+        log("\n=== CASE 9: Delete User Without Authorization ===")
+        
+        # Register another user to try to delete
+        random_suffix = secrets.token_hex(4)
+        temp_email = f"tempuser_{random_suffix}@example.com"
+        
+        resp = requests.post(f"{BASE_URL}/auth/register", json={
+            "first_name": "Temp",
+            "last_name": "User",
+            "email": temp_email,
+            "password": "temppass123"
+        })
+        assert_eq(resp.status_code, 200, "Temp user registration")
+        temp_user_id = resp.json()["user"]["id"]
+        
+        # Try to delete without Authorization header
+        resp = requests.delete(f"{BASE_URL}/admin/users/{temp_user_id}")
+        
+        assert_true(resp.status_code in [401, 403], 
+                   f"Delete without auth returns 401/403 (got {resp.status_code})")
+        log(f"✓ Correctly rejected delete without auth: {resp.status_code} - {resp.json().get('detail', '')}")
+        
+    def case_10_delete_with_non_admin_token(self):
+        """Case 10: DELETE /api/admin/users/{id} with non-admin token -> 403"""
+        log("\n=== CASE 10: Delete User with Non-Admin Token ===")
+        
+        # Register a non-admin user
+        random_suffix = secrets.token_hex(4)
+        nonadmin_email = f"nonadmin_{random_suffix}@example.com"
+        
+        resp = requests.post(f"{BASE_URL}/auth/register", json={
+            "first_name": "NonAdmin",
+            "last_name": "User",
+            "email": nonadmin_email,
+            "password": "nonadminpass123"
+        })
+        assert_eq(resp.status_code, 200, "Non-admin user registration")
+        nonadmin_token = resp.json()["token"]
+        
+        # Register another user to try to delete
+        random_suffix2 = secrets.token_hex(4)
+        target_email = f"target_{random_suffix2}@example.com"
+        
+        resp = requests.post(f"{BASE_URL}/auth/register", json={
+            "first_name": "Target",
+            "last_name": "User",
+            "email": target_email,
+            "password": "targetpass123"
+        })
+        assert_eq(resp.status_code, 200, "Target user registration")
+        target_user_id = resp.json()["user"]["id"]
+        
+        # Try to delete with non-admin token
+        resp = requests.delete(
+            f"{BASE_URL}/admin/users/{target_user_id}",
+            headers={"Authorization": f"Bearer {nonadmin_token}"}
+        )
+        
+        assert_eq(resp.status_code, 403, "Delete with non-admin token returns 403")
+        log(f"✓ Correctly rejected delete with non-admin token: {resp.json().get('detail', '')}")
+        
+    def run_all_tests(self):
+        """Run all test cases"""
+        try:
+            self.setup_admin_token()
+            self.case_1_register_fresh_user()
+            self.case_2_create_user_data()
+            self.case_3_delete_user_success()
+            self.case_4_verify_user_gone_from_list()
+            self.case_5_verify_user_not_found()
+            self.case_6_verify_token_invalid()
+            self.case_7_delete_admin_account()
+            self.case_8_delete_nonexistent_user()
+            self.case_9_delete_without_auth()
+            self.case_10_delete_with_non_admin_token()
+            
+            log("\n" + "="*60)
+            log("✅ ALL 10 ADMIN DELETE USER TEST CASES PASSED")
+            log("="*60)
+            return True
+            
+        except AssertionError as e:
+            log(f"\n❌ TEST FAILED: {e}")
+            return False
+        except Exception as e:
+            log(f"\n❌ UNEXPECTED ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+
 if __name__ == "__main__":
     import sys
     
-    if len(sys.argv) > 1 and sys.argv[1] == "hotwallet":
+    if len(sys.argv) > 1 and sys.argv[1] == "deleteuser":
+        # Run admin delete user tests
+        tester = TestAdminDeleteUser()
+        success = tester.run_all_tests()
+    elif len(sys.argv) > 1 and sys.argv[1] == "hotwallet":
         # Run admin hot wallet settings tests
         tester = TestAdminHotWalletSettings()
         success = tester.run_all_tests()

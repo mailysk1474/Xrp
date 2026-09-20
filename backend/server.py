@@ -1267,6 +1267,8 @@ async def admin_delete_user(user_id: str, admin: dict = Depends(require_admin)):
         "email": u.get("email"), "username": u.get("username"),
         "stakes": st.deleted_count, "transactions": tx.deleted_count,
     })
+    # Instantly end the deleted user's live session, then refresh admin views.
+    await manager.notify_user(user_id, {"type": "force_logout", "reason": "account_deleted"})
     await manager.notify_admins()
     return {"ok": True, "deleted": {"stakes": st.deleted_count, "transactions": tx.deleted_count}}
 

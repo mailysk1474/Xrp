@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Users, ArrowDownToLine, ArrowUpFromLine, ScrollText, Lock, Search,
-  Loader2, Check, X, Crown, Plus, Minus, Sliders, LayoutDashboard, Layers, Mail, Copy, Wallet, Clock, TrendingUp,
+  Loader2, Check, X, Crown, Plus, Minus, Sliders, LayoutDashboard, Layers, Mail, Copy, Wallet, Clock, TrendingUp, Trash2, AlertTriangle,
 } from "lucide-react";
 
 const TIERS = ["auto", "starter", "silver", "gold", "platinum", "diamond"];
@@ -185,13 +185,14 @@ function UserDetailDialog({ userId, onClose, onChange }) {
   const [busy, setBusy] = useState(false);
   const [balDelta, setBalDelta] = useState("");
   const [profitDelta, setProfitDelta] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const load = useCallback(() => {
     if (!userId) return;
     api.get(`/admin/users/${userId}`).then(({ data }) => setDetail(data)).catch((e) => toast.error(apiError(e)));
   }, [userId]);
 
-  useEffect(() => { setDetail(null); setBalDelta(""); setProfitDelta(""); load(); }, [userId, load]);
+  useEffect(() => { setDetail(null); setBalDelta(""); setProfitDelta(""); setConfirmDelete(false); load(); }, [userId, load]);
   useEffect(() => {
     const h = () => load();
     window.addEventListener("xp-refresh", h);
@@ -203,6 +204,19 @@ function UserDetailDialog({ userId, onClose, onChange }) {
     try { await fn(); if (msg) toast.success(msg); await load(); onChange(); }
     catch (e) { toast.error(apiError(e)); }
     finally { setBusy(false); }
+  };
+
+  const removeAccount = async () => {
+    setBusy(true);
+    try {
+      const { data } = await api.delete(`/admin/users/${userId}`);
+      toast.success(`Account deleted (${data?.deleted?.stakes ?? 0} stakes, ${data?.deleted?.transactions ?? 0} transactions removed).`);
+      onChange();
+      onClose();
+    } catch (e) {
+      toast.error(apiError(e));
+      setBusy(false);
+    }
   };
 
   const u = detail?.user;
@@ -290,6 +304,52 @@ function UserDetailDialog({ userId, onClose, onChange }) {
                 {(!detail.transactions || detail.transactions.length === 0) && <p className="text-sm text-slate-400">No activity.</p>}
               </div>
             </div>
+
+            {u?.role !== "admin" && (
+              <div className="bg-red-50 rounded-xl p-4 border border-red-200" data-testid="admin-danger-zone">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle size={16} className="text-red-500" />
+                  <p className="text-xs font-semibold uppercase tracking-wider text-red-600">Danger zone</p>
+                </div>
+                {!confirmDelete ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs text-red-700/80">Permanently delete this account, its stakes and transaction history. This cannot be undone.</p>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => setConfirmDelete(true)}
+                      data-testid="admin-delete-user-button"
+                      className="shrink-0 flex items-center gap-1.5 bg-white border border-red-300 text-red-600 hover:bg-red-600 hover:text-white disabled:opacity-50 text-sm font-semibold px-3 py-2 rounded-lg transition-colors"
+                    >
+                      <Trash2 size={14} /> Delete
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    <p className="text-sm text-red-700 font-medium">Delete @{u?.username} for good? The user is signed out immediately.</p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={removeAccount}
+                        data-testid="admin-confirm-delete-user"
+                        className="flex-1 flex items-center justify-center gap-1.5 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-sm font-semibold px-3 py-2 rounded-lg transition-colors"
+                      >
+                        {busy ? <Loader2 className="animate-spin" size={14} /> : <Trash2 size={14} />} Yes, delete permanently
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => setConfirmDelete(false)}
+                        className="px-3 py-2 rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 text-sm font-semibold transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </DialogContent>

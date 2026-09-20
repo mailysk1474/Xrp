@@ -53,6 +53,15 @@ export function AuthProvider({ children }) {
       ws.onmessage = (evt) => {
         try {
           const msg = JSON.parse(evt.data);
+          if (msg.type === "force_logout") {
+            try { storage.clearToken(); storage.clearVault(); } catch (e) { console.debug("clear failed", e); }
+            setUser(null);
+            setServerState(null);
+            toast.error("Your account has been removed by an administrator.");
+            try { ws.close(); } catch (e) { console.debug("ws close failed", e); }
+            setTimeout(() => { window.location.href = "/"; }, 1200);
+            return;
+          }
           if (msg.type === "notify") {
             refresh();
             window.dispatchEvent(new CustomEvent("xp-refresh", { detail: msg }));
@@ -105,7 +114,7 @@ export function AuthProvider({ children }) {
 
   const stopLiveSync = useCallback(() => {
     if (pollRef.current) clearInterval(pollRef.current);
-    if (wsRef.current) { try { wsRef.current.close(); } catch {} }
+    if (wsRef.current) { try { wsRef.current.close(); } catch (e) { console.debug("ws close failed", e); } }
     wsRef.current = null;
   }, []);
 
