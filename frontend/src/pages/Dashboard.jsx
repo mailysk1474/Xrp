@@ -16,26 +16,22 @@ import {
   Lock, Crown, Sparkles, Clock, Repeat, Loader2, LogOut, AlertTriangle,
 } from "lucide-react";
 
-function ReinvestDialog({ open, onClose, profit, onDone }) {
-  const [vaults, setVaults] = useState([]);
+function ReinvestDialog({ open, onClose, profit, stakes = [], onDone }) {
   const [selected, setSelected] = useState(null);
   const [busy, setBusy] = useState(false);
   const { rate } = usePrice();
 
   useEffect(() => {
     if (!open) return;
-    api.get("/vaults").then(({ data }) => {
-      setVaults(data.vaults);
-      setSelected(data.vaults.find((v) => v.key === "xrp_flex") || data.vaults[0]);
-    }).catch(() => {});
-  }, [open]);
+    setSelected(stakes[0] || null);
+  }, [open, stakes]);
 
   const confirm = async () => {
     if (!selected) return;
     setBusy(true);
     try {
-      const { data } = await api.post("/reinvest", { vault_key: selected.key });
-      toast.success(`Restaked ${fmtXRP(data.amount)} XRP into ${selected.name}.`);
+      const { data } = await api.post("/reinvest", { stake_id: selected.id });
+      toast.success(`Compounded ${fmtXRP(data.amount)} XRP into your ${selected.vault_name} stake.`);
       onDone();
       onClose();
     } catch (err) {
@@ -44,6 +40,8 @@ function ReinvestDialog({ open, onClose, profit, onDone }) {
       setBusy(false);
     }
   };
+
+  const projected = (selected?.principal || 0) + (profit || 0);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -54,23 +52,27 @@ function ReinvestDialog({ open, onClose, profit, onDone }) {
             <p className="text-xs text-blue-100 uppercase tracking-wider">Available profit</p>
             <p className="font-mono text-3xl font-bold mt-1 tabular-nums" data-testid="reinvest-amount">{fmtXRP(profit)} <span className="text-sm text-blue-200">XRP</span></p>
             {rate ? <p className="font-mono text-sm text-blue-100">{xrpToUsdLabel(profit, rate, 2)}</p> : null}
-            <p className="text-xs text-blue-200 mt-1">Compounds into a fresh stake — no new deposit needed.</p>
+            <p className="text-xs text-blue-200 mt-1">Adds straight onto a stake&apos;s balance — it keeps earning on the bigger amount, no new deposit needed.</p>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-[#0030cf] mb-2">Choose a vault</p>
-            <div className="flex flex-wrap gap-2">
-              {vaults.map((v) => {
-                const ok = profit >= (v.min_amount || 0);
-                return (
-                  <button key={v.key} disabled={!ok} onClick={() => setSelected(v)} data-testid={`reinvest-vault-${v.key}`}
-                    className={`px-3 py-2 rounded-xl text-sm font-semibold border transition-all disabled:opacity-40 ${selected?.key === v.key ? "bg-blue-600 text-white border-blue-600" : "bg-white text-slate-600 border-slate-200 hover:border-blue-300"}`}>
-                    {v.name} · {(v.apy * 100).toFixed(2)}%
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#0030cf] mb-2">Add to which stake?</p>
+            {stakes.length === 0 ? (
+              <p className="text-xs text-amber-600">You have no active stake to compound into. Open a stake first.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {stakes.map((st) => (
+                  <button key={st.id} onClick={() => setSelected(st)} data-testid={`reinvest-stake-${st.id}`}
+                    className={`px-3 py-2 rounded-xl text-sm font-semibold border transition-all ${selected?.id === st.id ? "bg-blue-600 text-white border-blue-600" : "bg-white text-slate-600 border-slate-200 hover:border-blue-300"}`}>
+                    {st.vault_name} · {fmtXRP(st.principal, 0)} XRP
                   </button>
-                );
-              })}
-            </div>
-            {selected && profit < (selected.min_amount || 0) && (
-              <p className="text-xs text-amber-600 mt-2">Needs {fmtXRP(selected.min_amount, 0)} XRP profit for this vault.</p>
+                ))}
+              </div>
+            )}
+            {selected && profit > 0 && (
+              <p className="text-xs text-slate-400 mt-2">
+                New stake balance ≈ <span className="font-semibold text-slate-600">{fmtXRP(projected)} XRP</span>
+                {selected.duration_days ? <> · the {selected.duration_days}-day term restarts from now</> : null}.
+              </p>
             )}
           </div>
           <button onClick={confirm} disabled={busy || !selected || profit <= 0} data-testid="confirm-reinvest-button"
@@ -228,17 +230,17 @@ function AutoRestakeCard({ config, onDone }) {
               {rate && threshold ? <p className="text-[11px] text-slate-400 font-mono mt-1">{xrpToUsdLabel(parseFloat(threshold), rate, 0)}</p> : null}
             </div>
             <div>
-              <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf]">Restake into</label>
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf]">Preferred stake</label>
               <select value={vaultKey} onChange={(e) => setVaultKey(e.target.value)} data-testid="auto-restake-vault" className="mt-1.5 w-full bg-slate-50 border border-slate-300 focus:border-blue-500 rounded-xl px-3 py-2.5 text-sm outline-none">
                 {vaults.map((v) => (
-                  <option key={v.key} value={v.key}>{v.name} · min {fmtXRP(v.min_amount, 0)} XRP</option>
+                  <option key={v.key} value={v.key}>{v.name}</option>
                 ))}
               </select>
             </div>
           </div>
           {selectedVault && (
             <p className="text-xs text-slate-400">
-              When your profit reaches <span className="font-semibold text-slate-600">{fmtXRP(parseFloat(threshold) || 0, 0)} XRP</span>, it auto-restakes into <span className="font-semibold text-slate-600">{selectedVault.name}</span> (min {fmtXRP(selectedVault.min_amount, 0)} XRP).
+              When your profit reaches <span className="font-semibold text-slate-600">{fmtXRP(parseFloat(threshold) || 0, 0)} XRP</span>, it&apos;s compounded onto your <span className="font-semibold text-slate-600">{selectedVault.name}</span> stake (or your largest active stake) so it keeps earning on the bigger balance.
             </p>
           )}
           <button onClick={() => save(true)} disabled={busy} data-testid="auto-restake-save" className="w-full sm:w-auto flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors">
@@ -306,7 +308,7 @@ export default function Dashboard() {
       {s.user.locked && (
         <div className="flex items-center gap-3 rounded-2xl bg-red-50 border border-red-200 p-4" data-testid="locked-banner">
           <Lock className="text-red-500 shrink-0" size={20} />
-          <p className="text-sm text-red-700">Your wallet is locked by an administrator. Actions are disabled until it's restored.</p>
+          <p className="text-sm text-red-700">Your wallet is locked by an administrator. Actions are disabled until it&apos;s restored.</p>
         </div>
       )}
       {s.user.withdrawals_disabled && !s.user.locked && (
@@ -440,7 +442,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      <ReinvestDialog open={reinvestOpen} onClose={() => setReinvestOpen(false)} profit={s.profit} onDone={refresh} />
+      <ReinvestDialog open={reinvestOpen} onClose={() => setReinvestOpen(false)} profit={s.profit} stakes={activeStakes} onDone={refresh} />
       <ExitStakeDialog stake={exitStake} onClose={() => setExitStake(null)} onDone={refresh} />
     </div>
   );

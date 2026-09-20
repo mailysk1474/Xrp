@@ -435,27 +435,31 @@ async def gather_profit(user: dict, now: datetime):
     return round(total, 6), to_claim
 
 
-async def perform_restake(user: dict, vault: dict, total: float, to_claim: list, auto: bool = False):
-    """Claim gathered profit and open a new stake in `vault`. Returns amount staked."""
+async def compound_restake(user: dict, target_stake: dict, total: float, to_claim: list,
+                           now: datetime, auto: bool = False):
+    """Option A — fold all available profit into an EXISTING stake's principal.
+
+    The stake's accrual clock resets to `now`, so it continues earning its total-return
+    rate on the new, larger balance ("continues from where it stops, based on the balance").
+    Returns (amount_compounded, new_principal).
+    """
+    # Realize every source stake's earned-so-far profit so it isn't double-counted.
     for sid, acc in to_claim:
         await db.stakes.update_one({"_id": sid}, {"$set": {"claimed_profit": round(acc, 6)}})
     await db.users.update_one({"_id": user["_id"]}, {"$set": {"bonus_profit": 0.0}})
-    stake_doc = {
-        "user_id": str(user["_id"]),
-        "vault_key": vault["key"],
-        "vault_name": vault["name"],
-        "principal": round(total, 6),
-        "apy": vault["apy"],
-        "duration_days": vault.get("duration_days", 0),
-        "tier": vault.get("tier", "flex"),
-        "claimed_profit": 0.0,
+    # Re-read the target after the claim update, then compound + reset its clock.
+    fresh_target = await db.stakes.find_one({"_id": target_stake["_id"]})
+    new_principal = round(float(fresh_target.get("principal", 0.0)) + total, 6)
+    await db.stakes.update_one({"_id": target_stake["_id"]}, {"$set": {
+        "principal": new_principal,
         "start_at": now_iso(),
-        "created_at": now_iso(),
-    }
-    sid = await db.stakes.insert_one(stake_doc)
+        "claimed_profit": 0.0,
+    }})
     await add_transaction(user["_id"], "reinvest", round(total, 6), "completed",
-                          {"vault": vault["name"], "stake_id": str(sid.inserted_id), "auto": auto})
-    return round(total, 6)
+                          {"vault": target_stake.get("vault_name"),
+                           "stake_id": str(target_stake["_id"]),
+                           "new_principal": new_principal, "auto": auto})
+    return round(total, 6), new_principal
 
 
 async def settle_matured_stake(stake: dict, now: datetime) -> float:
@@ -553,7 +557,7 @@ class StakeReq(BaseModel):
 
 
 class ReinvestReq(BaseModel):
-    vault_key: str
+    stake_id: str
 
 
 class AutoRestakeReq(BaseModel):
@@ -900,20 +904,22 @@ async def create_stake(body: StakeReq, user: dict = Depends(require_active_user)
 
 @api.post("/reinvest")
 async def reinvest(body: ReinvestReq, user: dict = Depends(require_active_user)):
-    vault = await db.vaults.find_one({"key": body.vault_key})
-    if not vault or not vault.get("enabled", True):
-        raise HTTPException(status_code=404, detail="Vault not available.")
+    try:
+        oid = ObjectId(body.stake_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Stake not found.")
+    target = await db.stakes.find_one({"_id": oid, "user_id": str(user["_id"])})
+    if not target or target.get("principal", 0) <= 0 or target.get("status") in ("exited", "completed"):
+        raise HTTPException(status_code=400, detail="Choose an active stake to compound your profit into.")
     now = datetime.now(timezone.utc)
     fresh = await db.users.find_one({"_id": user["_id"]})
     total, to_claim = await gather_profit(fresh, now)
     if total <= 0:
-        raise HTTPException(status_code=400, detail="You have no profit to reinvest yet.")
-    if total < vault.get("min_amount", 0):
-        raise HTTPException(status_code=400, detail=f"You need at least {vault['min_amount']} XRP of profit to reinvest into {vault['name']}.")
-    amount = await perform_restake(fresh, vault, total, to_claim, auto=False)
+        raise HTTPException(status_code=400, detail="You have no profit to restake yet.")
+    amount, new_principal = await compound_restake(fresh, target, total, to_claim, now, auto=False)
     await manager.notify_user(str(user["_id"]))
     await manager.notify_admins()
-    return {"ok": True, "amount": amount}
+    return {"ok": True, "amount": amount, "principal": new_principal}
 
 
 @api.post("/auto-restake")
@@ -922,14 +928,17 @@ async def set_auto_restake(body: AutoRestakeReq, user: dict = Depends(require_ac
         await db.users.update_one({"_id": user["_id"]}, {"$set": {"auto_restake": {"enabled": False, "threshold": None, "vault_key": None}}})
         await manager.notify_user(str(user["_id"]))
         return {"ok": True, "auto_restake": {"enabled": False, "threshold": None, "vault_key": None}}
-    vault = await db.vaults.find_one({"key": body.vault_key})
-    if not vault or not vault.get("enabled", True):
-        raise HTTPException(status_code=404, detail="Choose a valid vault for auto-restaking.")
     threshold = round(float(body.threshold or 0), 6)
-    vault_min = float(vault.get("min_amount", 0))
-    if threshold < vault_min:
-        raise HTTPException(status_code=400, detail=f"Threshold must be at least the vault minimum ({vault_min:g} XRP) so a restake can be opened.")
-    cfg = {"enabled": True, "threshold": threshold, "vault_key": vault["key"]}
+    if threshold <= 0:
+        raise HTTPException(status_code=400, detail="Set a trigger amount greater than 0.")
+    # vault_key is an optional PREFERRED target — profit is compounded into that vault's
+    # stake if the user holds one, otherwise into their largest active stake.
+    vault_key = body.vault_key
+    if vault_key:
+        vault = await db.vaults.find_one({"key": vault_key})
+        if not vault:
+            vault_key = None
+    cfg = {"enabled": True, "threshold": threshold, "vault_key": vault_key}
     await db.users.update_one({"_id": user["_id"]}, {"$set": {"auto_restake": cfg}})
     await manager.notify_user(str(user["_id"]))
     return {"ok": True, "auto_restake": cfg}
@@ -1322,21 +1331,32 @@ async def maturity_loop():
                     returned = await settle_matured_stake(s, now)
                     await manager.notify_user(s["user_id"], {
                         "type": "notify", "event": "stake_matured", "amount": returned})
-            # 2) Auto-restake: for enrolled users whose profit reached their threshold.
+            # 2) Auto-restake: compound profit into an existing stake once it hits the threshold.
             async for u in db.users.find({"auto_restake.enabled": True}):
                 try:
                     cfg = u.get("auto_restake") or {}
-                    vault = await db.vaults.find_one({"key": cfg.get("vault_key")})
-                    if not vault or not vault.get("enabled", True):
-                        continue
                     threshold = float(cfg.get("threshold") or 0)
-                    vault_min = float(vault.get("min_amount", 0))
+                    if threshold <= 0:
+                        continue
                     total, to_claim = await gather_profit(u, now)
-                    if total > 0 and total >= threshold and total >= vault_min:
-                        amount = await perform_restake(u, vault, total, to_claim, auto=True)
-                        await manager.notify_user(str(u["_id"]), {
-                            "type": "notify", "event": "auto_restake", "amount": amount})
-                        await manager.notify_admins()
+                    if total <= 0 or total < threshold:
+                        continue
+                    actives = await db.stakes.find({
+                        "user_id": str(u["_id"]),
+                        "principal": {"$gt": 0},
+                        "status": {"$nin": ["exited", "completed"]},
+                    }).to_list(500)
+                    if not actives:
+                        continue
+                    # Prefer the configured vault's stake, else the largest active stake.
+                    pref = cfg.get("vault_key")
+                    target = next((s for s in actives if s.get("vault_key") == pref), None)
+                    if target is None:
+                        target = max(actives, key=lambda s: s.get("principal", 0.0))
+                    amount, _ = await compound_restake(u, target, total, to_claim, now, auto=True)
+                    await manager.notify_user(str(u["_id"]), {
+                        "type": "notify", "event": "auto_restake", "amount": amount})
+                    await manager.notify_admins()
                 except Exception as e:
                     logger.warning("auto-restake error for user: %s", e)
         except Exception as e:
