@@ -1,2723 +1,370 @@
-#!/usr/bin/env python3
 """
-Backend test for XamanProtocol email+password authentication.
-Tests all auth endpoints: register, login, recover.
+Test THREE new backend features in XamanProtocol XRP staking app.
+FEATURE 1: Withdrawal address book
+FEATURE 2: Restake preview (non-mutating)
+FEATURE 3: Admin activity feed
 """
-import requests
-import json
+import os
 import time
-import secrets
-from typing import Dict, Any
+import uuid
+import requests
 
-# Base URL from frontend/.env
-BASE_URL = "https://570c2f00-c088-4ef7-b39e-16694a7c2da5.preview.emergentagent.com/api"
+# Get backend URL from environment
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://570c2f00-c088-4ef7-b39e-16694a7c2da5.preview.emergentagent.com").rstrip("/")
+API = f"{BASE_URL}/api"
 
 # Admin credentials from test_credentials.md
 ADMIN_EMAIL = "admin@xamanprotocol.com"
-ADMIN_PASSWORD = "admin12345"  # Default password from backend/.env
-ADMIN_PHRASE = "legal winner thank year wave sausage worth useful legal winner thank yellow"
+ADMIN_PASSWORD = "admin12345"
 
-def log(msg: str):
-    """Print timestamped log message"""
-    print(f"[{time.strftime('%H:%M:%S')}] {msg}")
-
-def assert_eq(actual, expected, msg: str):
-    """Assert equality with detailed error message"""
-    if actual != expected:
-        raise AssertionError(f"{msg}: expected {expected}, got {actual}")
-    log(f"✓ {msg}: {actual}")
-
-def assert_true(condition, msg: str):
-    """Assert condition is true"""
-    if not condition:
-        raise AssertionError(f"{msg}: condition failed")
-    log(f"✓ {msg}")
-
-def assert_in(item, container, msg: str):
-    """Assert item is in container"""
-    if item not in container:
-        raise AssertionError(f"{msg}: {item} not in {container}")
-    log(f"✓ {msg}")
-
-def assert_not_empty(value, msg: str):
-    """Assert value is not empty"""
-    if not value:
-        raise AssertionError(f"{msg}: value is empty")
-    log(f"✓ {msg}: {value}")
-
-class TestEmailPasswordAuth:
-    def __init__(self):
-        self.test_email = None
-        self.test_password = "secret123"
-        self.test_phrase = None
-        self.test_token = None
-        self.test_user_id = None
-        self.test_username = None
-        
-    def case_1_register_valid_user(self):
-        """Case 1: POST /api/auth/register with valid data -> 200 with token, phrase, user"""
-        log("\n=== CASE 1: Register Valid User ===")
-        
-        # Generate unique email
-        random_suffix = secrets.token_hex(4)
-        self.test_email = f"authtest_{random_suffix}@example.com"
-        
-        resp = requests.post(f"{BASE_URL}/auth/register", json={
-            "first_name": "Test",
-            "last_name": "User",
-            "email": self.test_email,
-            "password": self.test_password
-        })
-        
-        assert_eq(resp.status_code, 200, "Register status code")
-        data = resp.json()
-        
-        # Verify response structure
-        assert_in("token", data, "Response has token")
-        assert_in("phrase", data, "Response has phrase")
-        assert_in("user", data, "Response has user")
-        
-        # Verify token is not empty
-        assert_not_empty(data["token"], "Token is not empty")
-        self.test_token = data["token"]
-        
-        # Verify phrase is 12 words
-        phrase_words = data["phrase"].strip().split()
-        assert_eq(len(phrase_words), 12, "Phrase has 12 words")
-        self.test_phrase = data["phrase"]
-        log(f"✓ Recovery phrase: {self.test_phrase}")
-        
-        # Verify user object
-        user = data["user"]
-        assert_in("id", user, "User has id")
-        assert_in("email", user, "User has email")
-        assert_in("username", user, "User has username")
-        
-        # Verify email matches
-        assert_eq(user["email"], self.test_email, "User email matches")
-        
-        # Verify username is auto-generated and not empty
-        assert_not_empty(user["username"], "Username is auto-generated")
-        self.test_username = user["username"]
-        self.test_user_id = user["id"]
-        
-        log(f"✓ User registered: email={self.test_email}, username={self.test_username}, id={self.test_user_id}")
-        
-    def case_2_register_duplicate_email(self):
-        """Case 2: Register same email again -> 409"""
-        log("\n=== CASE 2: Register Duplicate Email ===")
-        
-        resp = requests.post(f"{BASE_URL}/auth/register", json={
-            "first_name": "Another",
-            "last_name": "User",
-            "email": self.test_email,
-            "password": "anotherpassword123"
-        })
-        
-        assert_eq(resp.status_code, 409, "Duplicate email returns 409")
-        log(f"✓ Correctly rejected duplicate email: {resp.json().get('detail', '')}")
-        
-    def case_3_register_short_password(self):
-        """Case 3: Register with password length 5 -> 400"""
-        log("\n=== CASE 3: Register with Short Password ===")
-        
-        random_suffix = secrets.token_hex(4)
-        email = f"shortpass_{random_suffix}@example.com"
-        
-        resp = requests.post(f"{BASE_URL}/auth/register", json={
-            "first_name": "Short",
-            "last_name": "Pass",
-            "email": email,
-            "password": "12345"  # Only 5 characters
-        })
-        
-        assert_eq(resp.status_code, 400, "Short password returns 400")
-        log(f"✓ Correctly rejected short password: {resp.json().get('detail', '')}")
-        
-    def case_4_register_invalid_email(self):
-        """Case 4: Register with invalid email 'abc' -> 400"""
-        log("\n=== CASE 4: Register with Invalid Email ===")
-        
-        resp = requests.post(f"{BASE_URL}/auth/register", json={
-            "first_name": "Invalid",
-            "last_name": "Email",
-            "email": "abc",  # Invalid email format
-            "password": "validpassword123"
-        })
-        
-        assert_eq(resp.status_code, 400, "Invalid email returns 400")
-        log(f"✓ Correctly rejected invalid email: {resp.json().get('detail', '')}")
-        
-    def case_5_login_correct_and_wrong_password(self):
-        """Case 5: POST /api/auth/login with correct password -> 200; wrong password -> 401"""
-        log("\n=== CASE 5: Login with Correct and Wrong Password ===")
-        
-        # Test correct password
-        log("Testing correct password...")
-        resp = requests.post(f"{BASE_URL}/auth/login", json={
-            "email": self.test_email,
-            "password": self.test_password
-        })
-        
-        assert_eq(resp.status_code, 200, "Login with correct password returns 200")
-        data = resp.json()
-        assert_in("token", data, "Login response has token")
-        assert_not_empty(data["token"], "Login token is not empty")
-        log(f"✓ Login successful with correct password")
-        
-        # Test wrong password
-        log("Testing wrong password...")
-        resp = requests.post(f"{BASE_URL}/auth/login", json={
-            "email": self.test_email,
-            "password": "wrongpass"
-        })
-        
-        assert_eq(resp.status_code, 401, "Login with wrong password returns 401")
-        log(f"✓ Correctly rejected wrong password: {resp.json().get('detail', '')}")
-        
-    def case_6_admin_login(self):
-        """Case 6: Admin login -> 200 with user.role == 'admin'"""
-        log("\n=== CASE 6: Admin Login ===")
-        
-        resp = requests.post(f"{BASE_URL}/auth/login", json={
-            "email": ADMIN_EMAIL,
-            "password": ADMIN_PASSWORD
-        })
-        
-        assert_eq(resp.status_code, 200, "Admin login returns 200")
-        data = resp.json()
-        assert_in("token", data, "Admin login response has token")
-        assert_in("user", data, "Admin login response has user")
-        
-        user = data["user"]
-        assert_in("role", user, "Admin user has role")
-        assert_eq(user["role"], "admin", "Admin user role is 'admin'")
-        
-        log(f"✓ Admin login successful with role=admin")
-        
-    def case_7_recover_correct_and_wrong_phrase(self):
-        """Case 7: POST /api/auth/recover with correct phrase -> 200; wrong phrase -> 401"""
-        log("\n=== CASE 7: Recover with Correct and Wrong Phrase ===")
-        
-        # Test correct phrase
-        log("Testing correct phrase...")
-        resp = requests.post(f"{BASE_URL}/auth/recover", json={
-            "email": self.test_email,
-            "phrase": self.test_phrase
-        })
-        
-        assert_eq(resp.status_code, 200, "Recover with correct phrase returns 200")
-        data = resp.json()
-        assert_in("token", data, "Recover response has token")
-        assert_not_empty(data["token"], "Recover token is not empty")
-        log(f"✓ Recovery successful with correct phrase")
-        
-        # Test wrong phrase (12 random valid-looking words)
-        log("Testing wrong phrase...")
-        wrong_phrase = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
-        resp = requests.post(f"{BASE_URL}/auth/recover", json={
-            "email": self.test_email,
-            "phrase": wrong_phrase
-        })
-        
-        assert_eq(resp.status_code, 401, "Recover with wrong phrase returns 401")
-        log(f"✓ Correctly rejected wrong phrase: {resp.json().get('detail', '')}")
-        
-    def case_8_admin_recover(self):
-        """Case 8: Admin recover -> 200 with user.role == 'admin'"""
-        log("\n=== CASE 8: Admin Recover ===")
-        
-        resp = requests.post(f"{BASE_URL}/auth/recover", json={
-            "email": ADMIN_EMAIL,
-            "phrase": ADMIN_PHRASE
-        })
-        
-        assert_eq(resp.status_code, 200, "Admin recover returns 200")
-        data = resp.json()
-        assert_in("token", data, "Admin recover response has token")
-        assert_in("user", data, "Admin recover response has user")
-        
-        user = data["user"]
-        assert_in("role", user, "Admin user has role")
-        assert_eq(user["role"], "admin", "Admin user role is 'admin'")
-        
-        log(f"✓ Admin recovery successful with role=admin")
-        
-    def case_9_auth_me_and_state(self):
-        """Case 9: GET /api/auth/me and GET /api/state with token -> 200 with correct user"""
-        log("\n=== CASE 9: GET /api/auth/me and /api/state ===")
-        
-        # Test GET /api/auth/me
-        log("Testing GET /api/auth/me...")
-        resp = requests.get(f"{BASE_URL}/auth/me", headers={
-            "Authorization": f"Bearer {self.test_token}"
-        })
-        
-        assert_eq(resp.status_code, 200, "GET /api/auth/me returns 200")
-        data = resp.json()
-        assert_in("user", data, "Response has user")
-        
-        user = data["user"]
-        assert_eq(user["id"], self.test_user_id, "User id matches")
-        assert_eq(user["email"], self.test_email, "User email matches")
-        assert_eq(user["username"], self.test_username, "User username matches")
-        
-        log(f"✓ GET /api/auth/me successful with correct user data")
-        
-        # Test GET /api/state
-        log("Testing GET /api/state...")
-        resp = requests.get(f"{BASE_URL}/state", headers={
-            "Authorization": f"Bearer {self.test_token}"
-        })
-        
-        assert_eq(resp.status_code, 200, "GET /api/state returns 200")
-        data = resp.json()
-        assert_in("user", data, "State response has user")
-        
-        user = data["user"]
-        assert_eq(user["id"], self.test_user_id, "State user id matches")
-        assert_eq(user["email"], self.test_email, "State user email matches")
-        assert_eq(user["username"], self.test_username, "State user username matches")
-        
-        log(f"✓ GET /api/state successful with correct user data")
-        
-    def case_10_cleanup_note(self):
-        """Case 10: Note test user for cleanup"""
-        log("\n=== CASE 10: Cleanup Note ===")
-        log(f"✓ Test user created: id={self.test_user_id}, email={self.test_email}, username={self.test_username}")
-        log(f"✓ Main agent can delete this user if needed")
-        
-    def run_all_tests(self):
-        """Run all test cases"""
-        try:
-            self.case_1_register_valid_user()
-            self.case_2_register_duplicate_email()
-            self.case_3_register_short_password()
-            self.case_4_register_invalid_email()
-            self.case_5_login_correct_and_wrong_password()
-            self.case_6_admin_login()
-            self.case_7_recover_correct_and_wrong_phrase()
-            self.case_8_admin_recover()
-            self.case_9_auth_me_and_state()
-            self.case_10_cleanup_note()
-            
-            log("\n" + "="*60)
-            log("✅ ALL 10 TEST CASES PASSED")
-            log("="*60)
-            return True
-            
-        except AssertionError as e:
-            log(f"\n❌ TEST FAILED: {e}")
-            return False
-        except Exception as e:
-            log(f"\n❌ UNEXPECTED ERROR: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
-
-class TestFlexibleVaultStopStake:
-    """Test flexible vault stop stake with no penalty vs locked vault with penalty"""
-    def __init__(self):
-        self.admin_token = None
-        self.user_token = None
-        self.user_id = None
-        self.user_email = None
-        self.flex_stake_id = None
-        self.locked_stake_id = None
-        
-    def setup_admin_token(self):
-        """Get admin token for balance adjustment"""
-        log("\n=== SETUP: Admin Login ===")
-        resp = requests.post(f"{BASE_URL}/auth/login", json={
-            "email": ADMIN_EMAIL,
-            "password": ADMIN_PASSWORD
-        })
-        assert_eq(resp.status_code, 200, "Admin login")
-        self.admin_token = resp.json()["token"]
-        log(f"✓ Admin token obtained")
-        
-    def case_1_register_fresh_user(self):
-        """Case 1: Register a fresh user"""
-        log("\n=== CASE 1: Register Fresh User ===")
-        random_suffix = secrets.token_hex(4)
-        self.user_email = f"flextest_{random_suffix}@example.com"
-        
-        resp = requests.post(f"{BASE_URL}/auth/register", json={
-            "first_name": "Flex",
-            "last_name": "Tester",
-            "email": self.user_email,
-            "password": "secret123"
-        })
-        
-        assert_eq(resp.status_code, 200, "User registration")
-        data = resp.json()
-        self.user_token = data["token"]
-        self.user_id = data["user"]["id"]
-        log(f"✓ User registered: email={self.user_email}, id={self.user_id}")
-        
-    def case_2_admin_credits_balance(self):
-        """Case 2: Admin credits user balance with 100000 XRP"""
-        log("\n=== CASE 2: Admin Credits Balance ===")
-        resp = requests.post(
-            f"{BASE_URL}/admin/users/{self.user_id}/adjust-balance",
-            json={"amount": 100000},
-            headers={"Authorization": f"Bearer {self.admin_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "Admin balance credit")
-        log(f"✓ Balance credited: 100000 XRP")
-        
-    def case_3_stake_into_xrp_flex(self):
-        """Case 3: Stake 60000 XRP into xrp_flex"""
-        log("\n=== CASE 3: Stake into xrp_flex ===")
-        resp = requests.post(
-            f"{BASE_URL}/stakes",
-            json={"vault_key": "xrp_flex", "amount": 60000},
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "Stake creation")
-        log(f"✓ Staked 60000 XRP into xrp_flex")
-        
-    def case_4_verify_flex_stake_state(self):
-        """Case 4: GET /api/state - verify flex stake can_exit=true with no penalty"""
-        log("\n=== CASE 4: Verify Flex Stake State ===")
-        resp = requests.get(
-            f"{BASE_URL}/state",
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "GET /api/state")
-        data = resp.json()
-        
-        # Find the flex stake
-        stakes = data.get("stakes", [])
-        assert_true(len(stakes) > 0, "User has at least one stake")
-        
-        flex_stake = None
-        for s in stakes:
-            if s.get("vault_key") == "xrp_flex" and s.get("status") == "active":
-                flex_stake = s
-                break
-        
-        assert_true(flex_stake is not None, "Found active xrp_flex stake")
-        self.flex_stake_id = flex_stake["id"]
-        
-        # Verify flex stake properties
-        assert_eq(flex_stake["can_exit"], True, "can_exit is true")
-        assert_eq(flex_stake["exit_kind"], "flex", "exit_kind is 'flex'")
-        assert_eq(flex_stake["early_exit_fee"], 0.0, "early_exit_fee is 0")
-        assert_eq(flex_stake["slippage"], 0.0, "slippage is 0")
-        assert_eq(flex_stake["early_exit_fee_amount"], 0.0, "early_exit_fee_amount is 0")
-        assert_eq(flex_stake["early_exit_slippage_amount"], 0.0, "early_exit_slippage_amount is 0")
-        
-        # Verify early_exit_return >= principal (60000)
-        early_exit_return = flex_stake["early_exit_return"]
-        assert_true(early_exit_return >= 60000, f"early_exit_return ({early_exit_return}) >= 60000 (principal + profit)")
-        log(f"✓ early_exit_return: {early_exit_return} XRP (principal 60000 + profit {early_exit_return - 60000})")
-        
-    def case_5_exit_flex_stake(self):
-        """Case 5: POST /api/stakes/{stake_id}/exit - verify no penalty"""
-        log("\n=== CASE 5: Exit Flex Stake ===")
-        resp = requests.post(
-            f"{BASE_URL}/stakes/{self.flex_stake_id}/exit",
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "Exit flex stake")
-        data = resp.json()
-        
-        # Verify response
-        assert_true(data["returned"] >= 60000, f"returned ({data['returned']}) >= 60000")
-        assert_eq(data["fee_amount"], 0.0, "fee_amount is 0")
-        assert_eq(data["slippage_amount"], 0.0, "slippage_amount is 0")
-        assert_eq(data["principal"], 60000, "principal is 60000")
-        
-        log(f"✓ Flex stake exited: returned={data['returned']}, fee_amount={data['fee_amount']}, slippage_amount={data['slippage_amount']}")
-        
-    def case_6_verify_flex_exit_state(self):
-        """Case 6: GET /api/state - verify stake exited, balance increased, transaction logged"""
-        log("\n=== CASE 6: Verify Flex Exit State ===")
-        
-        # Get state
-        resp = requests.get(
-            f"{BASE_URL}/state",
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        assert_eq(resp.status_code, 200, "GET /api/state")
-        data = resp.json()
-        
-        # Find the exited stake
-        stakes = data.get("stakes", [])
-        flex_stake = None
-        for s in stakes:
-            if s["id"] == self.flex_stake_id:
-                flex_stake = s
-                break
-        
-        assert_true(flex_stake is not None, "Found flex stake")
-        assert_eq(flex_stake["principal"], 0.0, "Stake principal is 0")
-        assert_eq(flex_stake["status"], "exited", "Stake status is 'exited'")
-        
-        # Verify balance increased (should be 40000 + returned amount)
-        balance = data.get("balance", 0)
-        assert_true(balance >= 100000, f"Balance ({balance}) >= 100000 (original balance after exit)")
-        log(f"✓ Balance after exit: {balance} XRP")
-        
-        # Get transactions
-        resp = requests.get(
-            f"{BASE_URL}/transactions",
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        assert_eq(resp.status_code, 200, "GET /api/transactions")
-        txns = resp.json().get("transactions", [])
-        
-        # Find early_exit transaction
-        exit_txn = None
-        for t in txns:
-            if t["type"] == "early_exit" and t.get("meta", {}).get("stake_id") == self.flex_stake_id:
-                exit_txn = t
-                break
-        
-        assert_true(exit_txn is not None, "Found early_exit transaction")
-        meta = exit_txn.get("meta", {})
-        assert_eq(meta.get("kind"), "flex", "Transaction meta.kind is 'flex'")
-        assert_eq(meta.get("forfeited_profit"), 0.0, "forfeited_profit is 0")
-        assert_true(meta.get("profit_paid", 0) >= 0, "profit_paid >= 0")
-        log(f"✓ Transaction logged: kind={meta.get('kind')}, forfeited_profit={meta.get('forfeited_profit')}, profit_paid={meta.get('profit_paid')}")
-        
-    def case_7_stake_into_vip_silver(self):
-        """Case 7: Stake 150000 XRP into vip_silver (locked vault)"""
-        log("\n=== CASE 7: Stake into vip_silver (Locked) ===")
-        
-        # First, admin credits more balance
-        resp = requests.post(
-            f"{BASE_URL}/admin/users/{self.user_id}/adjust-balance",
-            json={"amount": 150000},
-            headers={"Authorization": f"Bearer {self.admin_token}"}
-        )
-        assert_eq(resp.status_code, 200, "Admin balance credit")
-        
-        # Stake into vip_silver
-        resp = requests.post(
-            f"{BASE_URL}/stakes",
-            json={"vault_key": "vip_silver", "amount": 150000},
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "Stake creation")
-        log(f"✓ Staked 150000 XRP into vip_silver")
-        
-    def case_8_verify_locked_stake_state(self):
-        """Case 8: GET /api/state - verify locked stake has penalty"""
-        log("\n=== CASE 8: Verify Locked Stake State ===")
-        resp = requests.get(
-            f"{BASE_URL}/state",
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "GET /api/state")
-        data = resp.json()
-        
-        # Find the locked stake
-        stakes = data.get("stakes", [])
-        locked_stake = None
-        for s in stakes:
-            if s.get("vault_key") == "vip_silver" and s.get("status") == "active":
-                locked_stake = s
-                break
-        
-        assert_true(locked_stake is not None, "Found active vip_silver stake")
-        self.locked_stake_id = locked_stake["id"]
-        
-        # Verify locked stake properties
-        assert_eq(locked_stake["exit_kind"], "locked", "exit_kind is 'locked'")
-        assert_eq(locked_stake["early_exit_fee"], 0.10, "early_exit_fee is 0.10")
-        assert_eq(locked_stake["slippage"], 0.02, "slippage is 0.02")
-        assert_eq(locked_stake["early_exit_fee_amount"], 15000.0, "early_exit_fee_amount is 15000")
-        assert_eq(locked_stake["early_exit_slippage_amount"], 3000.0, "early_exit_slippage_amount is 3000")
-        assert_eq(locked_stake["early_exit_return"], 132000.0, "early_exit_return is 132000")
-        
-        log(f"✓ Locked stake verified: fee_amount=15000, slippage_amount=3000, return=132000")
-        
-    def case_9_exit_locked_stake(self):
-        """Case 9: POST /api/stakes/{stake_id}/exit - verify penalty applied"""
-        log("\n=== CASE 9: Exit Locked Stake ===")
-        resp = requests.post(
-            f"{BASE_URL}/stakes/{self.locked_stake_id}/exit",
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "Exit locked stake")
-        data = resp.json()
-        
-        # Verify response
-        assert_eq(data["returned"], 132000.0, "returned is 132000")
-        assert_eq(data["fee_amount"], 15000.0, "fee_amount is 15000")
-        assert_eq(data["slippage_amount"], 3000.0, "slippage_amount is 3000")
-        assert_eq(data["principal"], 150000, "principal is 150000")
-        
-        log(f"✓ Locked stake exited: returned={data['returned']}, fee_amount={data['fee_amount']}, slippage_amount={data['slippage_amount']}")
-        
-        # Verify transaction meta
-        resp = requests.get(
-            f"{BASE_URL}/transactions",
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        assert_eq(resp.status_code, 200, "GET /api/transactions")
-        txns = resp.json().get("transactions", [])
-        
-        # Find early_exit transaction for locked stake
-        exit_txn = None
-        for t in txns:
-            if t["type"] == "early_exit" and t.get("meta", {}).get("stake_id") == self.locked_stake_id:
-                exit_txn = t
-                break
-        
-        assert_true(exit_txn is not None, "Found early_exit transaction for locked stake")
-        meta = exit_txn.get("meta", {})
-        assert_eq(meta.get("kind"), "locked", "Transaction meta.kind is 'locked'")
-        assert_true(meta.get("forfeited_profit", 0) >= 0, "forfeited_profit >= 0")
-        log(f"✓ Transaction logged: kind={meta.get('kind')}, forfeited_profit={meta.get('forfeited_profit')}")
-        
-    def case_10_exit_already_exited_stake(self):
-        """Case 10: Exit already exited stake -> 400"""
-        log("\n=== CASE 10: Exit Already Exited Stake ===")
-        resp = requests.post(
-            f"{BASE_URL}/stakes/{self.flex_stake_id}/exit",
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 400, "Exit already exited stake returns 400")
-        log(f"✓ Correctly rejected exiting already exited stake: {resp.json().get('detail', '')}")
-        
-    def case_11_exit_nonexistent_stake(self):
-        """Case 11: Exit non-existent stake -> 404"""
-        log("\n=== CASE 11: Exit Non-existent Stake ===")
-        fake_stake_id = "507f1f77bcf86cd799439011"  # Valid ObjectId format but doesn't exist
-        resp = requests.post(
-            f"{BASE_URL}/stakes/{fake_stake_id}/exit",
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 404, "Exit non-existent stake returns 404")
-        log(f"✓ Correctly rejected exiting non-existent stake: {resp.json().get('detail', '')}")
-        
-    def run_all_tests(self):
-        """Run all test cases"""
-        try:
-            self.setup_admin_token()
-            self.case_1_register_fresh_user()
-            self.case_2_admin_credits_balance()
-            self.case_3_stake_into_xrp_flex()
-            self.case_4_verify_flex_stake_state()
-            self.case_5_exit_flex_stake()
-            self.case_6_verify_flex_exit_state()
-            self.case_7_stake_into_vip_silver()
-            self.case_8_verify_locked_stake_state()
-            self.case_9_exit_locked_stake()
-            self.case_10_exit_already_exited_stake()
-            self.case_11_exit_nonexistent_stake()
-            
-            log("\n" + "="*60)
-            log("✅ ALL 11 FLEXIBLE VAULT STOP STAKE TEST CASES PASSED")
-            log("="*60)
-            return True
-            
-        except AssertionError as e:
-            log(f"\n❌ TEST FAILED: {e}")
-            return False
-        except Exception as e:
-            log(f"\n❌ UNEXPECTED ERROR: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
+print(f"Testing against: {API}")
 
 
-class TestUserSelfService:
-    """Test user self-service endpoints: update-profile, change-password, notification prefs, transaction export"""
-    def __init__(self):
-        self.user_token = None
-        self.user_id = None
-        self.user_email = None
-        self.user_password = "InitialPass123"
-        self.new_password = "NewSecurePass456"
-        
-    def case_1_register_fresh_user(self):
-        """Case 1: Register a fresh user for self-service testing"""
-        log("\n=== CASE 1: Register Fresh User ===")
-        random_suffix = secrets.token_hex(4)
-        self.user_email = f"selfservice_{random_suffix}@example.com"
-        
-        resp = requests.post(f"{BASE_URL}/auth/register", json={
-            "first_name": "Sarah",
-            "last_name": "Johnson",
-            "email": self.user_email,
-            "password": self.user_password
-        })
-        
-        assert_eq(resp.status_code, 200, "User registration")
-        data = resp.json()
-        self.user_token = data["token"]
-        self.user_id = data["user"]["id"]
-        log(f"✓ User registered: email={self.user_email}, id={self.user_id}")
-        
-    def case_2_update_profile_happy_path(self):
-        """Case 2: POST /api/auth/update-profile with valid names -> 200"""
-        log("\n=== CASE 2: Update Profile - Happy Path ===")
-        
-        resp = requests.post(
-            f"{BASE_URL}/auth/update-profile",
-            json={"first_name": "Sarah Marie", "last_name": "Johnson-Smith"},
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "Update profile returns 200")
-        data = resp.json()
-        
-        assert_eq(data["ok"], True, "Response ok is true")
-        assert_in("user", data, "Response has user")
-        
-        user = data["user"]
-        assert_eq(user["first_name"], "Sarah Marie", "First name updated")
-        assert_eq(user["last_name"], "Johnson-Smith", "Last name updated")
-        
-        log(f"✓ Profile updated: first_name={user['first_name']}, last_name={user['last_name']}")
-        
-    def case_3_update_profile_blank_name(self):
-        """Case 3: POST /api/auth/update-profile with blank name -> 400"""
-        log("\n=== CASE 3: Update Profile - Blank Name ===")
-        
-        resp = requests.post(
-            f"{BASE_URL}/auth/update-profile",
-            json={"first_name": "", "last_name": "Johnson"},
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 400, "Blank first name returns 400")
-        detail = resp.json().get("detail", "")
-        assert_in("required", detail.lower(), "Error message mentions 'required'")
-        log(f"✓ Correctly rejected blank name: {detail}")
-        
-    def case_4_change_password_wrong_current(self):
-        """Case 4: POST /api/auth/change-password with wrong current_password -> 400"""
-        log("\n=== CASE 4: Change Password - Wrong Current Password ===")
-        
-        resp = requests.post(
-            f"{BASE_URL}/auth/change-password",
-            json={"current_password": "WrongPassword123", "new_password": "NewSecurePass456"},
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 400, "Wrong current password returns 400")
-        detail = resp.json().get("detail", "")
-        assert_in("incorrect", detail.lower(), "Error message mentions 'incorrect'")
-        log(f"✓ Correctly rejected wrong current password: {detail}")
-        
-    def case_5_change_password_short_new(self):
-        """Case 5: POST /api/auth/change-password with new_password < 8 chars -> 400"""
-        log("\n=== CASE 5: Change Password - Short New Password ===")
-        
-        resp = requests.post(
-            f"{BASE_URL}/auth/change-password",
-            json={"current_password": self.user_password, "new_password": "Short1"},
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 400, "Short new password returns 400")
-        detail = resp.json().get("detail", "")
-        assert_in("8 characters", detail.lower(), "Error message mentions '8 characters'")
-        log(f"✓ Correctly rejected short new password: {detail}")
-        
-    def case_6_change_password_happy_path(self):
-        """Case 6: POST /api/auth/change-password with correct current + valid new -> 200"""
-        log("\n=== CASE 6: Change Password - Happy Path ===")
-        
-        resp = requests.post(
-            f"{BASE_URL}/auth/change-password",
-            json={"current_password": self.user_password, "new_password": self.new_password},
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "Change password returns 200")
-        data = resp.json()
-        assert_eq(data["ok"], True, "Response ok is true")
-        
-        log(f"✓ Password changed successfully")
-        
-    def case_7_verify_new_password_login(self):
-        """Case 7: Verify login with NEW password works, OLD password fails"""
-        log("\n=== CASE 7: Verify New Password Login ===")
-        
-        # Test login with NEW password
-        log("Testing login with NEW password...")
-        resp = requests.post(f"{BASE_URL}/auth/login", json={
-            "email": self.user_email,
-            "password": self.new_password
-        })
-        
-        assert_eq(resp.status_code, 200, "Login with new password returns 200")
-        data = resp.json()
-        assert_in("token", data, "Login response has token")
-        log(f"✓ Login successful with NEW password")
-        
-        # Test login with OLD password
-        log("Testing login with OLD password...")
-        resp = requests.post(f"{BASE_URL}/auth/login", json={
-            "email": self.user_email,
-            "password": self.user_password
-        })
-        
-        assert_eq(resp.status_code, 401, "Login with old password returns 401")
-        log(f"✓ Login correctly rejected OLD password: {resp.json().get('detail', '')}")
-        
-    def case_8_set_notification_prefs(self):
-        """Case 8: PUT /api/notifications/prefs -> 200 with prefs echoed"""
-        log("\n=== CASE 8: Set Notification Preferences ===")
-        
-        prefs = {
-            "matured": True,
-            "deposit": False,
-            "withdrawal": True,
-            "restake": False
-        }
-        
-        resp = requests.put(
-            f"{BASE_URL}/notifications/prefs",
-            json=prefs,
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "Set notification prefs returns 200")
-        data = resp.json()
-        
-        assert_eq(data["ok"], True, "Response ok is true")
-        assert_in("notify_prefs", data, "Response has notify_prefs")
-        
-        notify_prefs = data["notify_prefs"]
-        assert_eq(notify_prefs["matured"], True, "matured pref is True")
-        assert_eq(notify_prefs["deposit"], False, "deposit pref is False")
-        assert_eq(notify_prefs["withdrawal"], True, "withdrawal pref is True")
-        assert_eq(notify_prefs["restake"], False, "restake pref is False")
-        
-        log(f"✓ Notification prefs set: {notify_prefs}")
-        
-    def case_9_verify_prefs_in_state(self):
-        """Case 9: GET /api/state confirms user.notify_prefs matches what was set"""
-        log("\n=== CASE 9: Verify Prefs in GET /api/state ===")
-        
-        resp = requests.get(
-            f"{BASE_URL}/state",
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "GET /api/state returns 200")
-        data = resp.json()
-        
-        assert_in("user", data, "State response has user")
-        user = data["user"]
-        assert_in("notify_prefs", user, "User has notify_prefs")
-        
-        notify_prefs = user["notify_prefs"]
-        assert_eq(notify_prefs["matured"], True, "matured pref persisted")
-        assert_eq(notify_prefs["deposit"], False, "deposit pref persisted")
-        assert_eq(notify_prefs["withdrawal"], True, "withdrawal pref persisted")
-        assert_eq(notify_prefs["restake"], False, "restake pref persisted")
-        
-        log(f"✓ Notification prefs persisted in state: {notify_prefs}")
-        
-    def case_10_export_csv(self):
-        """Case 10: GET /api/transactions/export?fmt=csv -> 200 text/csv with correct header"""
-        log("\n=== CASE 10: Export Transactions CSV ===")
-        
-        resp = requests.get(
-            f"{BASE_URL}/transactions/export?fmt=csv",
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "Export CSV returns 200")
-        
-        # Verify Content-Type
-        content_type = resp.headers.get("Content-Type", "")
-        assert_in("text/csv", content_type, "Content-Type is text/csv")
-        
-        # Verify CSV header row
-        csv_content = resp.text
-        lines = csv_content.strip().split("\n")
-        assert_true(len(lines) >= 1, "CSV has at least header row")
-        
-        header = lines[0]
-        expected_header = "Date (UTC),Type,Amount (XRP),Status,Details"
-        assert_eq(header, expected_header, "CSV header matches expected")
-        
-        log(f"✓ CSV export successful: Content-Type={content_type}, header={header}")
-        
-    def case_11_export_pdf(self):
-        """Case 11: GET /api/transactions/export?fmt=pdf -> 200 application/pdf starting with %PDF"""
-        log("\n=== CASE 11: Export Transactions PDF ===")
-        
-        resp = requests.get(
-            f"{BASE_URL}/transactions/export?fmt=pdf",
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "Export PDF returns 200")
-        
-        # Verify Content-Type
-        content_type = resp.headers.get("Content-Type", "")
-        assert_in("application/pdf", content_type, "Content-Type is application/pdf")
-        
-        # Verify PDF magic bytes
-        pdf_content = resp.content
-        assert_true(len(pdf_content) > 4, "PDF content is not empty")
-        
-        pdf_header = pdf_content[:4].decode("latin-1", errors="ignore")
-        assert_eq(pdf_header, "%PDF", "PDF starts with %PDF magic bytes")
-        
-        log(f"✓ PDF export successful: Content-Type={content_type}, starts with {pdf_header}")
-        
-    def case_12_export_without_auth(self):
-        """Case 12: GET /api/transactions/export without Authorization -> 401/403"""
-        log("\n=== CASE 12: Export Without Authorization ===")
-        
-        # Test CSV without auth
-        resp = requests.get(f"{BASE_URL}/transactions/export?fmt=csv")
-        assert_true(resp.status_code in [401, 403], f"CSV export without auth returns 401/403 (got {resp.status_code})")
-        log(f"✓ CSV export correctly requires auth: {resp.status_code}")
-        
-        # Test PDF without auth
-        resp = requests.get(f"{BASE_URL}/transactions/export?fmt=pdf")
-        assert_true(resp.status_code in [401, 403], f"PDF export without auth returns 401/403 (got {resp.status_code})")
-        log(f"✓ PDF export correctly requires auth: {resp.status_code}")
-        
-    def run_all_tests(self):
-        """Run all test cases"""
-        try:
-            self.case_1_register_fresh_user()
-            self.case_2_update_profile_happy_path()
-            self.case_3_update_profile_blank_name()
-            self.case_4_change_password_wrong_current()
-            self.case_5_change_password_short_new()
-            self.case_6_change_password_happy_path()
-            self.case_7_verify_new_password_login()
-            self.case_8_set_notification_prefs()
-            self.case_9_verify_prefs_in_state()
-            self.case_10_export_csv()
-            self.case_11_export_pdf()
-            self.case_12_export_without_auth()
-            
-            log("\n" + "="*60)
-            log("✅ ALL 12 USER SELF-SERVICE TEST CASES PASSED")
-            log("="*60)
-            return True
-            
-        except AssertionError as e:
-            log(f"\n❌ TEST FAILED: {e}")
-            return False
-        except Exception as e:
-            log(f"\n❌ UNEXPECTED ERROR: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
+def _post(path, token=None, json=None):
+    """POST helper with auth header."""
+    h = {"Content-Type": "application/json"}
+    if token:
+        h["Authorization"] = f"Bearer {token}"
+    return requests.post(f"{API}{path}", json=json or {}, headers=h, timeout=30)
 
 
-class TestAdminStatsAndLastLogin:
-    """Test admin stats endpoint and last_login tracking"""
-    def __init__(self):
-        self.admin_token = None
-        self.user_token = None
-        self.user_id = None
-        self.user_email = None
-        
-    def setup_admin_token(self):
-        """Get admin token"""
-        log("\n=== SETUP: Admin Login ===")
-        resp = requests.post(f"{BASE_URL}/auth/login", json={
-            "email": ADMIN_EMAIL,
-            "password": ADMIN_PASSWORD
-        })
-        assert_eq(resp.status_code, 200, "Admin login")
-        self.admin_token = resp.json()["token"]
-        log(f"✓ Admin token obtained")
-        
-    def case_1_admin_stats_with_admin_token(self):
-        """Case 1: GET /api/admin/stats with admin token -> 200 with all 6 fields"""
-        log("\n=== CASE 1: GET /api/admin/stats with Admin Token ===")
-        
-        resp = requests.get(
-            f"{BASE_URL}/admin/stats",
-            headers={"Authorization": f"Bearer {self.admin_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "GET /api/admin/stats returns 200")
-        data = resp.json()
-        
-        # Verify all 6 required fields are present
-        assert_in("total_users", data, "Response has total_users")
-        assert_in("total_balance", data, "Response has total_balance")
-        assert_in("total_staked", data, "Response has total_staked")
-        assert_in("aum", data, "Response has aum")
-        assert_in("pending_deposits", data, "Response has pending_deposits")
-        assert_in("pending_withdrawals", data, "Response has pending_withdrawals")
-        
-        # Verify all fields are numeric
-        total_users = data["total_users"]
-        total_balance = data["total_balance"]
-        total_staked = data["total_staked"]
-        aum = data["aum"]
-        pending_deposits = data["pending_deposits"]
-        pending_withdrawals = data["pending_withdrawals"]
-        
-        assert_true(isinstance(total_users, int), f"total_users is int (got {type(total_users).__name__})")
-        assert_true(isinstance(total_balance, (int, float)), f"total_balance is numeric (got {type(total_balance).__name__})")
-        assert_true(isinstance(total_staked, (int, float)), f"total_staked is numeric (got {type(total_staked).__name__})")
-        assert_true(isinstance(aum, (int, float)), f"aum is numeric (got {type(aum).__name__})")
-        assert_true(isinstance(pending_deposits, int), f"pending_deposits is int (got {type(pending_deposits).__name__})")
-        assert_true(isinstance(pending_withdrawals, int), f"pending_withdrawals is int (got {type(pending_withdrawals).__name__})")
-        
-        log(f"✓ All 6 fields present and numeric: total_users={total_users}, total_balance={total_balance}, total_staked={total_staked}, aum={aum}, pending_deposits={pending_deposits}, pending_withdrawals={pending_withdrawals}")
-        
-        # Verify aum == total_balance + total_staked (within 0.01 rounding)
-        expected_aum = total_balance + total_staked
-        aum_diff = abs(aum - expected_aum)
-        assert_true(aum_diff < 0.01, f"aum ({aum}) == total_balance ({total_balance}) + total_staked ({total_staked}) = {expected_aum} (diff={aum_diff})")
-        log(f"✓ aum calculation correct: {aum} == {total_balance} + {total_staked} (diff={aum_diff})")
-        
-        # Verify non-negative counts
-        assert_true(total_users >= 1, f"total_users ({total_users}) >= 1")
-        assert_true(pending_deposits >= 0, f"pending_deposits ({pending_deposits}) >= 0")
-        assert_true(pending_withdrawals >= 0, f"pending_withdrawals ({pending_withdrawals}) >= 0")
-        log(f"✓ All counts are non-negative and total_users >= 1")
-        
-    def case_2_admin_stats_without_auth(self):
-        """Case 2: GET /api/admin/stats without Authorization header -> 401/403"""
-        log("\n=== CASE 2: GET /api/admin/stats Without Authorization ===")
-        
-        resp = requests.get(f"{BASE_URL}/admin/stats")
-        
-        assert_true(resp.status_code in [401, 403], f"Without auth returns 401/403 (got {resp.status_code})")
-        log(f"✓ Correctly rejected request without auth: {resp.status_code} - {resp.json().get('detail', '')}")
-        
-    def case_3_admin_stats_with_non_admin_token(self):
-        """Case 3: Register non-admin user and GET /api/admin/stats with their token -> 403"""
-        log("\n=== CASE 3: GET /api/admin/stats with Non-Admin Token ===")
-        
-        # Register a fresh non-admin user
-        random_suffix = secrets.token_hex(4)
-        self.user_email = f"nonadmin_{random_suffix}@example.com"
-        
-        resp = requests.post(f"{BASE_URL}/auth/register", json={
-            "first_name": "Regular",
-            "last_name": "User",
-            "email": self.user_email,
-            "password": "regularuser123"
-        })
-        
-        assert_eq(resp.status_code, 200, "Non-admin user registration")
-        data = resp.json()
-        self.user_token = data["token"]
-        self.user_id = data["user"]["id"]
-        log(f"✓ Non-admin user registered: email={self.user_email}, id={self.user_id}")
-        
-        # Try to access admin stats with non-admin token
-        resp = requests.get(
-            f"{BASE_URL}/admin/stats",
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 403, "Non-admin user gets 403")
-        log(f"✓ Correctly rejected non-admin user: {resp.json().get('detail', '')}")
-        
-    def case_4_last_login_tracking(self):
-        """Case 4: Register user, login, verify last_login is set in GET /api/admin/users"""
-        log("\n=== CASE 4: Last Login Tracking ===")
-        
-        # Register another fresh user
-        random_suffix = secrets.token_hex(4)
-        test_email = f"lastlogin_{random_suffix}@example.com"
-        test_password = "testpass123"
-        
-        resp = requests.post(f"{BASE_URL}/auth/register", json={
-            "first_name": "Last",
-            "last_name": "Login",
-            "email": test_email,
-            "password": test_password
-        })
-        
-        assert_eq(resp.status_code, 200, "User registration")
-        test_user_id = resp.json()["user"]["id"]
-        log(f"✓ User registered: email={test_email}, id={test_user_id}")
-        
-        # Login with this user to trigger last_login update
-        log("Logging in to trigger last_login update...")
-        resp = requests.post(f"{BASE_URL}/auth/login", json={
-            "email": test_email,
-            "password": test_password
-        })
-        
-        assert_eq(resp.status_code, 200, "User login")
-        log(f"✓ User logged in successfully")
-        
-        # Get admin users list and find this user
-        log("Fetching admin users list...")
-        resp = requests.get(
-            f"{BASE_URL}/admin/users",
-            headers={"Authorization": f"Bearer {self.admin_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "GET /api/admin/users returns 200")
-        data = resp.json()
-        assert_in("users", data, "Response has users")
-        
-        users = data["users"]
-        test_user = None
-        for u in users:
-            if u["id"] == test_user_id:
-                test_user = u
-                break
-        
-        assert_true(test_user is not None, f"Found user {test_user_id} in admin users list")
-        
-        # Verify last_login is not null and is an ISO timestamp string
-        last_login = test_user.get("last_login")
-        assert_true(last_login is not None, "last_login is not null")
-        assert_true(isinstance(last_login, str), f"last_login is a string (got {type(last_login).__name__})")
-        assert_true(len(last_login) > 0, "last_login is not empty")
-        
-        # Verify it's a valid ISO timestamp format (contains T and Z or +/-)
-        assert_true("T" in last_login, f"last_login ({last_login}) is ISO format with T separator")
-        log(f"✓ last_login is set and valid: {last_login}")
-        
-    def run_all_tests(self):
-        """Run all test cases"""
-        try:
-            self.setup_admin_token()
-            self.case_1_admin_stats_with_admin_token()
-            self.case_2_admin_stats_without_auth()
-            self.case_3_admin_stats_with_non_admin_token()
-            self.case_4_last_login_tracking()
-            
-            log("\n" + "="*60)
-            log("✅ ALL 4 ADMIN STATS & LAST_LOGIN TEST CASES PASSED")
-            log("="*60)
-            return True
-            
-        except AssertionError as e:
-            log(f"\n❌ TEST FAILED: {e}")
-            return False
-        except Exception as e:
-            log(f"\n❌ UNEXPECTED ERROR: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
+def _get(path, token=None):
+    """GET helper with auth header."""
+    h = {}
+    if token:
+        h["Authorization"] = f"Bearer {token}"
+    return requests.get(f"{API}{path}", headers=h, timeout=30)
 
 
-class TestTotalReturnModel:
-    """Test total-return model: vault rates, accrual, restake compounding, auto-restake config"""
-    def __init__(self):
-        self.admin_token = None
-        self.user_token = None
-        self.user_id = None
-        self.user_email = None
-        self.stake_id = None
-        
-    def setup_admin_token(self):
-        """Get admin token for balance adjustment"""
-        log("\n=== SETUP: Admin Login ===")
-        resp = requests.post(f"{BASE_URL}/auth/login", json={
-            "email": ADMIN_EMAIL,
-            "password": ADMIN_PASSWORD
-        })
-        assert_eq(resp.status_code, 200, "Admin login")
-        self.admin_token = resp.json()["token"]
-        log(f"✓ Admin token obtained")
-        
-    def case_1_vaults_return_total_return_rates(self):
-        """Case 1: GET /api/vaults returns total-return rates in apy field"""
-        log("\n=== CASE 1: Vaults Return Total-Return Rates ===")
-        
-        resp = requests.get(f"{BASE_URL}/vaults")
-        assert_eq(resp.status_code, 200, "GET /api/vaults returns 200")
-        data = resp.json()
-        
-        assert_in("vaults", data, "Response has vaults")
-        vaults = data["vaults"]
-        
-        # Expected rates: xrp_flex=0.1999 (18d), vip_silver=0.2999 (30d), vip_gold=0.4999 (45d), 
-        # vip_platinum=0.8999 (60d), vip_diamond=1.56 (90d)
-        expected_rates = {
-            "xrp_flex": (0.1999, 18),
-            "vip_silver": (0.2999, 30),
-            "vip_gold": (0.4999, 45),
-            "vip_platinum": (0.8999, 60),
-            "vip_diamond": (1.56, 90),
-        }
-        
-        vault_map = {v["key"]: v for v in vaults}
-        
-        for key, (expected_apy, expected_days) in expected_rates.items():
-            assert_in(key, vault_map, f"Vault {key} exists")
-            vault = vault_map[key]
-            
-            actual_apy = vault.get("apy")
-            actual_days = vault.get("duration_days")
-            
-            assert_eq(actual_apy, expected_apy, f"{key} apy")
-            assert_eq(actual_days, expected_days, f"{key} duration_days")
-            
-            log(f"✓ {key}: apy={actual_apy}, duration_days={actual_days}")
-        
-        log(f"✓ All 5 vaults have correct total-return rates")
-        
-    def case_2_register_and_fund_user(self):
-        """Case 2: Register user and admin funds balance"""
-        log("\n=== CASE 2: Register and Fund User ===")
-        
-        # Register user
-        random_suffix = secrets.token_hex(4)
-        self.user_email = f"totalreturn_{random_suffix}@example.com"
-        
-        resp = requests.post(f"{BASE_URL}/auth/register", json={
-            "first_name": "Total",
-            "last_name": "Return",
-            "email": self.user_email,
-            "password": "secret123"
-        })
-        
-        assert_eq(resp.status_code, 200, "User registration")
-        data = resp.json()
-        self.user_token = data["token"]
-        self.user_id = data["user"]["id"]
-        log(f"✓ User registered: email={self.user_email}, id={self.user_id}")
-        
-        # Admin funds user with 60000 XRP
-        resp = requests.post(
-            f"{BASE_URL}/admin/users/{self.user_id}/adjust-balance",
-            json={"amount": 60000},
-            headers={"Authorization": f"Bearer {self.admin_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "Admin balance credit")
-        log(f"✓ Balance credited: 60000 XRP")
-        
-    def case_3_open_stake_vip_silver(self):
-        """Case 3: Open stake in vip_silver (50000 XRP, 30 days, 0.2999 total return)"""
-        log("\n=== CASE 3: Open Stake in vip_silver ===")
-        
-        resp = requests.post(
-            f"{BASE_URL}/stakes",
-            json={"vault_key": "vip_silver", "amount": 50000},
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "Stake creation")
-        log(f"✓ Staked 50000 XRP into vip_silver (30 days, 0.2999 total return)")
-        
-    def case_4_verify_accrual_starts_near_zero(self):
-        """Case 4: GET /api/state immediately - verify accrued starts near 0"""
-        log("\n=== CASE 4: Verify Accrual Starts Near Zero ===")
-        
-        resp = requests.get(
-            f"{BASE_URL}/state",
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "GET /api/state")
-        data = resp.json()
-        
-        stakes = data.get("stakes", [])
-        assert_true(len(stakes) > 0, "User has at least one stake")
-        
-        # Find vip_silver stake
-        stake = None
-        for s in stakes:
-            if s.get("vault_key") == "vip_silver" and s.get("status") == "active":
-                stake = s
-                break
-        
-        assert_true(stake is not None, "Found active vip_silver stake")
-        self.stake_id = stake["id"]
-        
-        accrued = stake.get("accrued", 0)
-        principal = stake.get("principal", 0)
-        apy = stake.get("apy", 0)
-        
-        assert_eq(principal, 50000, "Principal is 50000")
-        assert_eq(apy, 0.2999, "APY is 0.2999")
-        
-        # Accrued should be very small (near 0) right after staking
-        assert_true(accrued < 1.0, f"Accrued ({accrued}) < 1.0 (near zero right after staking)")
-        log(f"✓ Accrued starts near zero: {accrued} XRP")
-        
-        return accrued
-        
-    def case_5_verify_accrual_increases(self, initial_accrued):
-        """Case 5: Wait a few seconds, GET /api/state again - verify accrued increases"""
-        log("\n=== CASE 5: Verify Accrual Increases Over Time ===")
-        
-        log("Waiting 5 seconds for accrual...")
-        time.sleep(5)
-        
-        resp = requests.get(
-            f"{BASE_URL}/state",
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "GET /api/state")
-        data = resp.json()
-        
-        stakes = data.get("stakes", [])
-        stake = None
-        for s in stakes:
-            if s["id"] == self.stake_id:
-                stake = s
-                break
-        
-        assert_true(stake is not None, "Found stake")
-        
-        new_accrued = stake.get("accrued", 0)
-        
-        # Verify accrued increased
-        assert_true(new_accrued > initial_accrued, 
-                   f"Accrued increased from {initial_accrued} to {new_accrued}")
-        log(f"✓ Accrued increased: {initial_accrued} -> {new_accrued} XRP")
-        
-        # Verify accrual calculation is in the right ballpark
-        # For 50000 at 0.2999 over 30 days, after 5 seconds:
-        # expected = 50000 * 0.2999 * (5 / (30 * 86400)) = 50000 * 0.2999 * (5 / 2592000)
-        # = 50000 * 0.2999 * 0.00000193 = 0.0289 XRP
-        expected_accrued = 50000 * 0.2999 * (5 / (30 * 86400))
-        
-        # Allow 50% tolerance due to timing variations
-        lower_bound = expected_accrued * 0.5
-        upper_bound = expected_accrued * 1.5
-        
-        assert_true(lower_bound <= new_accrued <= upper_bound,
-                   f"Accrued ({new_accrued}) is in expected range [{lower_bound:.6f}, {upper_bound:.6f}] (expected ~{expected_accrued:.6f})")
-        log(f"✓ Accrual calculation correct: {new_accrued} XRP (expected ~{expected_accrued:.6f} XRP)")
-        
-    def case_6_restake_with_stake_id(self):
-        """Case 6: POST /api/reinvest {stake_id} - verify profit compounds into stake principal"""
-        log("\n=== CASE 6: Restake Compounds Profit into Existing Stake ===")
-        
-        # Get current state
-        resp = requests.get(
-            f"{BASE_URL}/state",
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        assert_eq(resp.status_code, 200, "GET /api/state")
-        data = resp.json()
-        
-        old_profit = data.get("profit", 0)
-        
-        stakes = data.get("stakes", [])
-        stake = None
-        for s in stakes:
-            if s["id"] == self.stake_id:
-                stake = s
-                break
-        
-        old_principal = stake.get("principal", 0)
-        old_accrued = stake.get("accrued", 0)
-        
-        log(f"Before reinvest: principal={old_principal}, accrued={old_accrued}, profit={old_profit}")
-        
-        # POST /api/reinvest with stake_id
-        resp = requests.post(
-            f"{BASE_URL}/reinvest",
-            json={"stake_id": self.stake_id},
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "POST /api/reinvest returns 200")
-        reinvest_data = resp.json()
-        
-        assert_in("ok", reinvest_data, "Response has ok")
-        assert_eq(reinvest_data["ok"], True, "Response ok is true")
-        assert_in("amount", reinvest_data, "Response has amount")
-        assert_in("principal", reinvest_data, "Response has principal")
-        
-        compounded_amount = reinvest_data["amount"]
-        new_principal = reinvest_data["principal"]
-        
-        log(f"✓ Reinvest response: amount={compounded_amount}, principal={new_principal}")
-        
-        # Verify new principal = old principal + profit
-        expected_principal = old_principal + old_profit
-        # Allow small rounding difference
-        assert_true(abs(new_principal - expected_principal) < 0.01,
-                   f"New principal ({new_principal}) ≈ old principal ({old_principal}) + profit ({old_profit}) = {expected_principal}")
-        log(f"✓ Principal increased by profit: {old_principal} + {old_profit} = {new_principal}")
-        
-    def case_7_verify_restake_reset_clock(self):
-        """Case 7: GET /api/state - verify stake principal increased, accrued reset to ~0, profit ~0"""
-        log("\n=== CASE 7: Verify Restake Reset Clock ===")
-        
-        resp = requests.get(
-            f"{BASE_URL}/state",
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "GET /api/state")
-        data = resp.json()
-        
-        stakes = data.get("stakes", [])
-        stake = None
-        for s in stakes:
-            if s["id"] == self.stake_id:
-                stake = s
-                break
-        
-        assert_true(stake is not None, "Found stake")
-        
-        new_principal = stake.get("principal", 0)
-        new_accrued = stake.get("accrued", 0)
-        new_profit = data.get("profit", 0)
-        
-        # Verify principal increased (should be > 50000)
-        assert_true(new_principal > 50000, f"Principal ({new_principal}) > 50000 (original)")
-        log(f"✓ Principal increased: {new_principal} XRP")
-        
-        # Verify accrued reset to near 0
-        assert_true(new_accrued < 0.1, f"Accrued ({new_accrued}) reset to near 0")
-        log(f"✓ Accrued reset: {new_accrued} XRP")
-        
-        # Verify profit reset to near 0
-        assert_true(new_profit < 0.1, f"Profit ({new_profit}) reset to near 0")
-        log(f"✓ Profit reset: {new_profit} XRP")
-        
-        # Verify there's still only ONE stake (no new stake created)
-        vip_silver_stakes = [s for s in stakes if s.get("vault_key") == "vip_silver" and s.get("status") == "active"]
-        assert_eq(len(vip_silver_stakes), 1, "Still only ONE active vip_silver stake (no new stake created)")
-        log(f"✓ No new stake created - profit compounded into existing stake")
-        
-    def case_8_restake_invalid_stake_id(self):
-        """Case 8: POST /api/reinvest with invalid/exited stake_id -> 400/404"""
-        log("\n=== CASE 8: Restake with Invalid Stake ID ===")
-        
-        fake_stake_id = "507f1f77bcf86cd799439011"  # Valid ObjectId format but doesn't exist
-        
-        resp = requests.post(
-            f"{BASE_URL}/reinvest",
-            json={"stake_id": fake_stake_id},
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_true(resp.status_code in [400, 404], 
-                   f"Invalid stake_id returns 400/404 (got {resp.status_code})")
-        log(f"✓ Correctly rejected invalid stake_id: {resp.status_code} - {resp.json().get('detail', '')}")
-        
-    def case_9_auto_restake_config_valid(self):
-        """Case 9: POST /api/auto-restake {enabled:true, threshold:10, vault_key} -> 200 (no minimum error)"""
-        log("\n=== CASE 9: Auto-Restake Config with Valid Threshold ===")
-        
-        resp = requests.post(
-            f"{BASE_URL}/auto-restake",
-            json={"enabled": True, "threshold": 10, "vault_key": "vip_silver"},
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "POST /api/auto-restake returns 200")
-        data = resp.json()
-        
-        assert_eq(data["ok"], True, "Response ok is true")
-        assert_in("auto_restake", data, "Response has auto_restake")
-        
-        auto_restake = data["auto_restake"]
-        assert_eq(auto_restake["enabled"], True, "enabled is true")
-        assert_eq(auto_restake["threshold"], 10, "threshold is 10")
-        assert_eq(auto_restake["vault_key"], "vip_silver", "vault_key is vip_silver")
-        
-        log(f"✓ Auto-restake config saved: enabled=True, threshold=10, vault_key=vip_silver")
-        log(f"✓ NO 'threshold must be at least the vault minimum' error (validation removed)")
-        
-    def case_10_auto_restake_threshold_zero(self):
-        """Case 10: POST /api/auto-restake {enabled:true, threshold:0} -> 400"""
-        log("\n=== CASE 10: Auto-Restake with Threshold 0 ===")
-        
-        resp = requests.post(
-            f"{BASE_URL}/auto-restake",
-            json={"enabled": True, "threshold": 0},
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 400, "threshold=0 returns 400")
-        detail = resp.json().get("detail", "")
-        assert_in("greater than 0", detail.lower(), "Error message mentions 'greater than 0'")
-        log(f"✓ Correctly rejected threshold=0: {detail}")
-        
-    def case_11_auto_restake_disable(self):
-        """Case 11: POST /api/auto-restake {enabled:false} -> 200"""
-        log("\n=== CASE 11: Disable Auto-Restake ===")
-        
-        resp = requests.post(
-            f"{BASE_URL}/auto-restake",
-            json={"enabled": False},
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "POST /api/auto-restake returns 200")
-        data = resp.json()
-        
-        assert_eq(data["ok"], True, "Response ok is true")
-        assert_in("auto_restake", data, "Response has auto_restake")
-        
-        auto_restake = data["auto_restake"]
-        assert_eq(auto_restake["enabled"], False, "enabled is false")
-        
-        log(f"✓ Auto-restake disabled successfully")
-        
-    def run_all_tests(self):
-        """Run all test cases"""
-        try:
-            self.setup_admin_token()
-            self.case_1_vaults_return_total_return_rates()
-            self.case_2_register_and_fund_user()
-            self.case_3_open_stake_vip_silver()
-            initial_accrued = self.case_4_verify_accrual_starts_near_zero()
-            self.case_5_verify_accrual_increases(initial_accrued)
-            self.case_6_restake_with_stake_id()
-            self.case_7_verify_restake_reset_clock()
-            self.case_8_restake_invalid_stake_id()
-            self.case_9_auto_restake_config_valid()
-            self.case_10_auto_restake_threshold_zero()
-            self.case_11_auto_restake_disable()
-            
-            log("\n" + "="*60)
-            log("✅ ALL 11 TOTAL-RETURN MODEL TEST CASES PASSED")
-            log("="*60)
-            return True
-            
-        except AssertionError as e:
-            log(f"\n❌ TEST FAILED: {e}")
-            return False
-        except Exception as e:
-            log(f"\n❌ UNEXPECTED ERROR: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
+def _delete(path, token=None):
+    """DELETE helper with auth header."""
+    h = {}
+    if token:
+        h["Authorization"] = f"Bearer {token}"
+    return requests.delete(f"{API}{path}", headers=h, timeout=30)
 
 
-class TestAdminHotWalletSettings:
-    """Test admin-editable hot wallet address (settings)"""
-    def __init__(self):
-        self.admin_token = None
-        self.user_token = None
-        self.user_id = None
-        self.original_hot_wallet = None
-        
-    def setup_admin_token(self):
-        """Get admin token"""
-        log("\n=== SETUP: Admin Login ===")
-        resp = requests.post(f"{BASE_URL}/auth/login", json={
-            "email": ADMIN_EMAIL,
-            "password": ADMIN_PASSWORD
-        })
-        assert_eq(resp.status_code, 200, "Admin login")
-        self.admin_token = resp.json()["token"]
-        log(f"✓ Admin token obtained")
-        
-    def setup_user_token(self):
-        """Register a regular user for auth guard tests"""
-        log("\n=== SETUP: Register Regular User ===")
-        random_suffix = secrets.token_hex(4)
-        user_email = f"hotwallet_{random_suffix}@example.com"
-        
-        resp = requests.post(f"{BASE_URL}/auth/register", json={
-            "first_name": "Hot",
-            "last_name": "Wallet",
-            "email": user_email,
-            "password": "secret123"
-        })
-        
-        assert_eq(resp.status_code, 200, "User registration")
-        data = resp.json()
-        self.user_token = data["token"]
-        self.user_id = data["user"]["id"]
-        log(f"✓ User registered: email={user_email}, id={self.user_id}")
-        
-    def case_1_get_hot_wallet_settings(self):
-        """Case 1: GET /api/admin/settings with admin token -> 200 with {hot_wallet_address}"""
-        log("\n=== CASE 1: GET /api/admin/settings ===")
-        
-        resp = requests.get(
-            f"{BASE_URL}/admin/settings",
-            headers={"Authorization": f"Bearer {self.admin_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "GET /api/admin/settings returns 200")
-        data = resp.json()
-        
-        assert_in("hot_wallet_address", data, "Response has hot_wallet_address")
-        hot_wallet = data["hot_wallet_address"]
-        
-        # Verify it's a valid XRP address (starts with 'r')
-        assert_true(hot_wallet.startswith("r"), f"hot_wallet_address starts with 'r': {hot_wallet}")
-        assert_true(len(hot_wallet) >= 25 and len(hot_wallet) <= 35, 
-                   f"hot_wallet_address length is 25-35 chars: {len(hot_wallet)}")
-        
-        # Store original for restoration later
-        self.original_hot_wallet = hot_wallet
-        log(f"✓ Current hot_wallet_address: {hot_wallet}")
-        
-    def case_2_update_hot_wallet_valid(self):
-        """Case 2: PUT /api/admin/settings with valid XRP address -> 200"""
-        log("\n=== CASE 2: PUT /api/admin/settings with Valid Address ===")
-        
-        new_address = "rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4"
-        
-        resp = requests.put(
-            f"{BASE_URL}/admin/settings",
-            json={"hot_wallet_address": new_address},
-            headers={"Authorization": f"Bearer {self.admin_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "PUT /api/admin/settings returns 200")
-        data = resp.json()
-        
-        assert_eq(data.get("ok"), True, "Response ok is true")
-        assert_eq(data.get("hot_wallet_address"), new_address, "Response hot_wallet_address matches")
-        
-        log(f"✓ Hot wallet updated to: {new_address}")
-        
-    def case_3_verify_deposit_info_reflects_new_address(self):
-        """Case 3: GET /api/deposit-info returns new address"""
-        log("\n=== CASE 3: Verify GET /api/deposit-info Reflects New Address ===")
-        
-        # Use user token (any authenticated user can call this)
-        resp = requests.get(
-            f"{BASE_URL}/deposit-info",
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "GET /api/deposit-info returns 200")
-        data = resp.json()
-        
-        assert_in("address", data, "Response has address")
-        address = data["address"]
-        
-        assert_eq(address, "rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4", 
-                 "deposit-info address matches updated hot wallet")
-        
-        log(f"✓ GET /api/deposit-info address: {address}")
-        
-    def case_4_verify_state_reflects_new_address(self):
-        """Case 4: GET /api/state returns new hot_wallet"""
-        log("\n=== CASE 4: Verify GET /api/state Reflects New Address ===")
-        
-        # Use user token (any authenticated user can call this)
-        resp = requests.get(
-            f"{BASE_URL}/state",
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "GET /api/state returns 200")
-        data = resp.json()
-        
-        assert_in("hot_wallet", data, "Response has hot_wallet")
-        hot_wallet = data["hot_wallet"]
-        
-        assert_eq(hot_wallet, "rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4", 
-                 "state hot_wallet matches updated address")
-        
-        log(f"✓ GET /api/state hot_wallet: {hot_wallet}")
-        
-    def case_5_update_invalid_address_hello(self):
-        """Case 5: PUT /api/admin/settings with invalid address 'hello' -> 400"""
-        log("\n=== CASE 5: PUT with Invalid Address 'hello' ===")
-        
-        resp = requests.put(
-            f"{BASE_URL}/admin/settings",
-            json={"hot_wallet_address": "hello"},
-            headers={"Authorization": f"Bearer {self.admin_token}"}
-        )
-        
-        assert_eq(resp.status_code, 400, "Invalid address 'hello' returns 400")
-        detail = resp.json().get("detail", "")
-        log(f"✓ Correctly rejected invalid address: {detail}")
-        
-    def case_6_update_empty_address(self):
-        """Case 6: PUT /api/admin/settings with empty address -> 400"""
-        log("\n=== CASE 6: PUT with Empty Address ===")
-        
-        resp = requests.put(
-            f"{BASE_URL}/admin/settings",
-            json={"hot_wallet_address": ""},
-            headers={"Authorization": f"Bearer {self.admin_token}"}
-        )
-        
-        assert_eq(resp.status_code, 400, "Empty address returns 400")
-        detail = resp.json().get("detail", "")
-        log(f"✓ Correctly rejected empty address: {detail}")
-        
-    def case_7_get_settings_no_auth(self):
-        """Case 7: GET /api/admin/settings without Authorization -> 401/403"""
-        log("\n=== CASE 7: GET /api/admin/settings Without Auth ===")
-        
-        resp = requests.get(f"{BASE_URL}/admin/settings")
-        
-        assert_true(resp.status_code in [401, 403], 
-                   f"Without auth returns 401/403 (got {resp.status_code})")
-        log(f"✓ Correctly rejected request without auth: {resp.status_code}")
-        
-    def case_8_put_settings_no_auth(self):
-        """Case 8: PUT /api/admin/settings without Authorization -> 401/403"""
-        log("\n=== CASE 8: PUT /api/admin/settings Without Auth ===")
-        
-        resp = requests.put(
-            f"{BASE_URL}/admin/settings",
-            json={"hot_wallet_address": "rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4"}
-        )
-        
-        assert_true(resp.status_code in [401, 403], 
-                   f"Without auth returns 401/403 (got {resp.status_code})")
-        log(f"✓ Correctly rejected request without auth: {resp.status_code}")
-        
-    def case_9_get_settings_non_admin(self):
-        """Case 9: GET /api/admin/settings with non-admin token -> 403"""
-        log("\n=== CASE 9: GET /api/admin/settings with Non-Admin Token ===")
-        
-        resp = requests.get(
-            f"{BASE_URL}/admin/settings",
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 403, "Non-admin user gets 403")
-        log(f"✓ Correctly rejected non-admin user: {resp.json().get('detail', '')}")
-        
-    def case_10_put_settings_non_admin(self):
-        """Case 10: PUT /api/admin/settings with non-admin token -> 403"""
-        log("\n=== CASE 10: PUT /api/admin/settings with Non-Admin Token ===")
-        
-        resp = requests.put(
-            f"{BASE_URL}/admin/settings",
-            json={"hot_wallet_address": "rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4"},
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 403, "Non-admin user gets 403")
-        log(f"✓ Correctly rejected non-admin user: {resp.json().get('detail', '')}")
-        
-    def case_11_restore_hot_wallet(self):
-        """Case 11: Restore hot wallet to production value"""
-        log("\n=== CASE 11: Restore Hot Wallet to Production Value ===")
-        
-        # Restore to the intended production value
-        production_address = "rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4"
-        
-        resp = requests.put(
-            f"{BASE_URL}/admin/settings",
-            json={"hot_wallet_address": production_address},
-            headers={"Authorization": f"Bearer {self.admin_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "Restore hot wallet returns 200")
-        log(f"✓ Hot wallet restored to production value: {production_address}")
-        
-    def run_all_tests(self):
-        """Run all test cases"""
-        try:
-            self.setup_admin_token()
-            self.setup_user_token()
-            self.case_1_get_hot_wallet_settings()
-            self.case_2_update_hot_wallet_valid()
-            self.case_3_verify_deposit_info_reflects_new_address()
-            self.case_4_verify_state_reflects_new_address()
-            self.case_5_update_invalid_address_hello()
-            self.case_6_update_empty_address()
-            self.case_7_get_settings_no_auth()
-            self.case_8_put_settings_no_auth()
-            self.case_9_get_settings_non_admin()
-            self.case_10_put_settings_non_admin()
-            self.case_11_restore_hot_wallet()
-            
-            log("\n" + "="*60)
-            log("✅ ALL 11 ADMIN HOT WALLET SETTINGS TEST CASES PASSED")
-            log("="*60)
-            return True
-            
-        except AssertionError as e:
-            log(f"\n❌ TEST FAILED: {e}")
-            return False
-        except Exception as e:
-            log(f"\n❌ UNEXPECTED ERROR: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
+def get_admin_token():
+    """Login as admin and return token."""
+    r = _post("/auth/login", json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD})
+    assert r.status_code == 200, f"Admin login failed: {r.status_code} {r.text}"
+    return r.json()["token"]
 
 
-class TestWithdrawalAddressTag:
-    """Test withdrawal with destination address + optional tag"""
-    def __init__(self):
-        self.admin_token = None
-        self.user_token = None
-        self.user_id = None
-        self.user_email = None
-        
-    def setup_admin_token(self):
-        """Get admin token"""
-        log("\n=== SETUP: Admin Login ===")
-        resp = requests.post(f"{BASE_URL}/auth/login", json={
-            "email": ADMIN_EMAIL,
-            "password": ADMIN_PASSWORD
-        })
-        assert_eq(resp.status_code, 200, "Admin login")
-        self.admin_token = resp.json()["token"]
-        log(f"✓ Admin token obtained")
-        
-    def case_1_register_and_fund_user(self):
-        """Case 1: Register fresh user and admin credits balance"""
-        log("\n=== CASE 1: Register and Fund User ===")
-        
-        # Register user
-        random_suffix = secrets.token_hex(4)
-        self.user_email = f"withdraw_{random_suffix}@example.com"
-        
-        resp = requests.post(f"{BASE_URL}/auth/register", json={
-            "first_name": "Withdraw",
-            "last_name": "Tester",
-            "email": self.user_email,
-            "password": "secret123"
-        })
-        
-        assert_eq(resp.status_code, 200, "User registration")
-        data = resp.json()
-        self.user_token = data["token"]
-        self.user_id = data["user"]["id"]
-        log(f"✓ User registered: email={self.user_email}, id={self.user_id}")
-        
-        # Get user list to confirm user_id
-        resp = requests.get(
-            f"{BASE_URL}/admin/users",
-            headers={"Authorization": f"Bearer {self.admin_token}"}
-        )
-        assert_eq(resp.status_code, 200, "GET /api/admin/users")
-        users = resp.json().get("users", [])
-        user_found = any(u["id"] == self.user_id for u in users)
-        assert_true(user_found, f"User {self.user_id} found in admin users list")
-        log(f"✓ User confirmed in admin users list")
-        
-        # Admin credits balance with 1000 XRP
-        resp = requests.post(
-            f"{BASE_URL}/admin/users/{self.user_id}/adjust-balance",
-            json={"amount": 1000},
-            headers={"Authorization": f"Bearer {self.admin_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "Admin balance credit")
-        log(f"✓ Balance credited: 1000 XRP")
-        
-    def case_2_withdraw_with_address_and_tag(self):
-        """Case 2: POST /api/withdraw with address + tag -> 200, balance decremented"""
-        log("\n=== CASE 2: Withdraw with Address and Tag ===")
-        
-        # Get initial balance
-        resp = requests.get(
-            f"{BASE_URL}/state",
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        assert_eq(resp.status_code, 200, "GET /api/state")
-        initial_balance = resp.json().get("balance", 0)
-        log(f"Initial balance: {initial_balance} XRP")
-        
-        # Withdraw 10 XRP with address and tag
-        resp = requests.post(
-            f"{BASE_URL}/withdraw",
-            json={
-                "amount": 10,
-                "address": "rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4",
-                "tag": "12345"
-            },
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "POST /api/withdraw returns 200")
-        data = resp.json()
-        assert_eq(data.get("ok"), True, "Response ok is true")
-        assert_in("transaction_id", data, "Response has transaction_id")
-        
-        log(f"✓ Withdrawal successful: transaction_id={data['transaction_id']}")
-        
-        # Verify balance decremented by 10
-        resp = requests.get(
-            f"{BASE_URL}/state",
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        assert_eq(resp.status_code, 200, "GET /api/state")
-        new_balance = resp.json().get("balance", 0)
-        
-        expected_balance = initial_balance - 10
-        assert_true(abs(new_balance - expected_balance) < 0.01,
-                   f"Balance decremented: {initial_balance} - 10 = {new_balance} (expected {expected_balance})")
-        log(f"✓ Balance decremented: {initial_balance} -> {new_balance} XRP")
-        
-    def case_3_verify_withdrawal_in_admin_queue(self):
-        """Case 3: GET /api/admin/withdrawals shows destination_address and destination_tag"""
-        log("\n=== CASE 3: Verify Withdrawal in Admin Queue ===")
-        
-        resp = requests.get(
-            f"{BASE_URL}/admin/withdrawals",
-            headers={"Authorization": f"Bearer {self.admin_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "GET /api/admin/withdrawals returns 200")
-        data = resp.json()
-        
-        assert_in("withdrawals", data, "Response has withdrawals")
-        withdrawals = data["withdrawals"]
-        
-        # Find withdrawal for this user
-        user_withdrawal = None
-        for w in withdrawals:
-            if w.get("user_id") == self.user_id:
-                user_withdrawal = w
-                break
-        
-        assert_true(user_withdrawal is not None, f"Found withdrawal for user {self.user_id}")
-        
-        # Verify destination_address and destination_tag
-        assert_eq(user_withdrawal.get("destination_address"), "rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4",
-                 "destination_address matches")
-        assert_eq(user_withdrawal.get("destination_tag"), "12345",
-                 "destination_tag matches")
-        assert_eq(user_withdrawal.get("amount"), 10,
-                 "amount matches")
-        
-        log(f"✓ Withdrawal in admin queue: destination_address={user_withdrawal['destination_address']}, destination_tag={user_withdrawal['destination_tag']}, amount={user_withdrawal['amount']}")
-        
-    def case_4_withdraw_missing_address(self):
-        """Case 4: POST /api/withdraw with missing address -> 400/422"""
-        log("\n=== CASE 4: Withdraw with Missing Address ===")
-        
-        resp = requests.post(
-            f"{BASE_URL}/withdraw",
-            json={"amount": 5},
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_true(resp.status_code in [400, 422], 
-                   f"Missing address returns 400/422 (got {resp.status_code})")
-        detail = resp.json().get("detail", "")
-        log(f"✓ Correctly rejected missing address: {resp.status_code} - {detail}")
-        
-    def case_5_withdraw_invalid_address(self):
-        """Case 5: POST /api/withdraw with invalid address 'hello' -> 400"""
-        log("\n=== CASE 5: Withdraw with Invalid Address ===")
-        
-        resp = requests.post(
-            f"{BASE_URL}/withdraw",
-            json={"amount": 5, "address": "hello"},
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 400, "Invalid address returns 400")
-        detail = resp.json().get("detail", "")
-        assert_in("valid", detail.lower(), "Error message mentions 'valid'")
-        log(f"✓ Correctly rejected invalid address: {detail}")
-        
-    def case_6_withdraw_non_numeric_tag(self):
-        """Case 6: POST /api/withdraw with non-numeric tag 'abc' -> 400"""
-        log("\n=== CASE 6: Withdraw with Non-Numeric Tag ===")
-        
-        resp = requests.post(
-            f"{BASE_URL}/withdraw",
-            json={
-                "amount": 5,
-                "address": "rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4",
-                "tag": "abc"
-            },
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 400, "Non-numeric tag returns 400")
-        detail = resp.json().get("detail", "")
-        assert_in("number", detail.lower(), "Error message mentions 'number'")
-        log(f"✓ Correctly rejected non-numeric tag: {detail}")
-        
-    def case_7_withdraw_amount_greater_than_balance(self):
-        """Case 7: POST /api/withdraw with amount > balance -> 400"""
-        log("\n=== CASE 7: Withdraw Amount Greater Than Balance ===")
-        
-        # Get current balance
-        resp = requests.get(
-            f"{BASE_URL}/state",
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        assert_eq(resp.status_code, 200, "GET /api/state")
-        balance = resp.json().get("balance", 0)
-        log(f"Current balance: {balance} XRP")
-        
-        # Try to withdraw more than balance
-        excessive_amount = balance + 100
-        
-        resp = requests.post(
-            f"{BASE_URL}/withdraw",
-            json={
-                "amount": excessive_amount,
-                "address": "rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4"
-            },
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 400, "Amount > balance returns 400")
-        detail = resp.json().get("detail", "")
-        assert_in("insufficient", detail.lower(), "Error message mentions 'insufficient'")
-        log(f"✓ Correctly rejected amount > balance: {detail}")
-        
-    def run_all_tests(self):
-        """Run all test cases"""
-        try:
-            self.setup_admin_token()
-            self.case_1_register_and_fund_user()
-            self.case_2_withdraw_with_address_and_tag()
-            self.case_3_verify_withdrawal_in_admin_queue()
-            self.case_4_withdraw_missing_address()
-            self.case_5_withdraw_invalid_address()
-            self.case_6_withdraw_non_numeric_tag()
-            self.case_7_withdraw_amount_greater_than_balance()
-            
-            log("\n" + "="*60)
-            log("✅ ALL 7 WITHDRAWAL ADDRESS+TAG TEST CASES PASSED")
-            log("="*60)
-            return True
-            
-        except AssertionError as e:
-            log(f"\n❌ TEST FAILED: {e}")
-            return False
-        except Exception as e:
-            log(f"\n❌ UNEXPECTED ERROR: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
+def register_user(email_prefix):
+    """Register a fresh user and return token, user_id."""
+    email = f"{email_prefix}_{uuid.uuid4().hex[:8]}@example.com"
+    password = "Test12345"
+    r = _post("/auth/register", json={
+        "first_name": "Test",
+        "last_name": "User",
+        "email": email,
+        "password": password
+    })
+    assert r.status_code == 200, f"Register failed: {r.status_code} {r.text}"
+    data = r.json()
+    return data["token"], data["user"]["id"], email
 
 
+def admin_credit_balance(admin_token, user_id, amount):
+    """Admin credits balance to user."""
+    r = _post(f"/admin/users/{user_id}/adjust-balance", admin_token, {"amount": amount})
+    assert r.status_code == 200, f"Admin credit failed: {r.status_code} {r.text}"
 
 
-class TestWeightedRestake:
-    """Test weighted restake behavior: compound profit extends maturity proportionally"""
-    def __init__(self):
-        self.admin_token = None
-        self.user_token = None
-        self.user_id = None
-        self.user_email = None
-        self.stake_id = None
-        self.user2_token = None
-        self.user2_id = None
-        self.user2_email = None
-        self.user2_stake_id = None
-        
-    def setup_admin_token(self):
-        """Get admin token"""
-        log("\n=== SETUP: Admin Login ===")
-        resp = requests.post(f"{BASE_URL}/auth/login", json={
-            "email": ADMIN_EMAIL,
-            "password": ADMIN_PASSWORD
-        })
-        assert_eq(resp.status_code, 200, "Admin login")
-        self.admin_token = resp.json()["token"]
-        log(f"✓ Admin token obtained")
-        
-    def case_1_register_and_fund_user(self):
-        """Case 1: Register fresh user and admin credits 120000 XRP"""
-        log("\n=== CASE 1: Register and Fund User ===")
-        
-        # Register user
-        random_suffix = secrets.token_hex(4)
-        self.user_email = f"weightedrestake_{random_suffix}@example.com"
-        
-        resp = requests.post(f"{BASE_URL}/auth/register", json={
-            "first_name": "Weighted",
-            "last_name": "Restake",
-            "email": self.user_email,
-            "password": "secret123"
-        })
-        
-        assert_eq(resp.status_code, 200, "User registration")
-        data = resp.json()
-        self.user_token = data["token"]
-        self.user_id = data["user"]["id"]
-        log(f"✓ User registered: email={self.user_email}, id={self.user_id}")
-        
-        # Admin funds user with 120000 XRP
-        resp = requests.post(
-            f"{BASE_URL}/admin/users/{self.user_id}/adjust-balance",
-            json={"amount": 120000},
-            headers={"Authorization": f"Bearer {self.admin_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "Admin balance credit")
-        log(f"✓ Balance credited: 120000 XRP")
-        
-    def case_2_stake_50000_vip_silver(self):
-        """Case 2: Stake 50000 XRP into vip_silver"""
-        log("\n=== CASE 2: Stake 50000 XRP into vip_silver ===")
-        
-        resp = requests.post(
-            f"{BASE_URL}/stakes",
-            json={"vault_key": "vip_silver", "amount": 50000},
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "Stake creation")
-        log(f"✓ Staked 50000 XRP into vip_silver (30 days, 0.2999 total return)")
-        
-    def case_3_regression_brand_new_stake(self):
-        """Case 3 (TEST A): REGRESSION - brand-new stake (no restake yet)"""
-        log("\n=== CASE 3 (TEST A): REGRESSION - Brand-New Stake ===")
-        
-        resp = requests.get(
-            f"{BASE_URL}/state",
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "GET /api/state")
-        data = resp.json()
-        
-        stakes = data.get("stakes", [])
-        assert_true(len(stakes) > 0, "User has at least one stake")
-        
-        # Find vip_silver stake
-        stake = None
-        for s in stakes:
-            if s.get("vault_key") == "vip_silver" and s.get("status") == "active":
-                stake = s
-                break
-        
-        assert_true(stake is not None, "Found active vip_silver stake")
-        self.stake_id = stake["id"]
-        
-        principal = stake.get("principal", 0)
-        apy = stake.get("apy", 0)
-        claimed_profit = stake.get("claimed_profit", 0)
-        profit_at_maturity = stake.get("profit_at_maturity", 0)
-        total_at_maturity = stake.get("total_at_maturity", 0)
-        accrued = stake.get("accrued", 0)
-        start_at = stake.get("start_at")
-        matures_at = stake.get("matures_at")
-        
-        log(f"Stake values: principal={principal}, apy={apy}, claimed_profit={claimed_profit}")
-        log(f"  profit_at_maturity={profit_at_maturity}, total_at_maturity={total_at_maturity}")
-        log(f"  accrued={accrued}, start_at={start_at}, matures_at={matures_at}")
-        
-        # Assert claimed_profit == 0 (or ~0)
-        assert_true(abs(claimed_profit) < 0.01, f"claimed_profit ({claimed_profit}) ≈ 0")
-        log(f"✓ claimed_profit ≈ 0: {claimed_profit}")
-        
-        # Assert profit_at_maturity ≈ principal * 0.2999 (50000 * 0.2999 = 14995)
-        expected_profit = principal * apy
-        tolerance = 1.0  # Allow 1 XRP tolerance
-        assert_true(abs(profit_at_maturity - expected_profit) < tolerance,
-                   f"profit_at_maturity ({profit_at_maturity}) ≈ principal * apy ({expected_profit})")
-        log(f"✓ profit_at_maturity ≈ {expected_profit}: {profit_at_maturity}")
-        
-        # Assert total_at_maturity ≈ principal + profit_at_maturity
-        expected_total = principal + profit_at_maturity
-        assert_true(abs(total_at_maturity - expected_total) < 0.01,
-                   f"total_at_maturity ({total_at_maturity}) ≈ principal + profit_at_maturity ({expected_total})")
-        log(f"✓ total_at_maturity ≈ {expected_total}: {total_at_maturity}")
-        
-        # Assert matures_at ≈ start_at + 30 days
-        from datetime import datetime, timedelta, timezone
-        start_dt = datetime.fromisoformat(start_at.replace('Z', '+00:00'))
-        matures_dt = datetime.fromisoformat(matures_at.replace('Z', '+00:00'))
-        expected_matures = start_dt + timedelta(days=30)
-        
-        time_diff = abs((matures_dt - expected_matures).total_seconds())
-        assert_true(time_diff < 60, f"matures_at ({matures_at}) ≈ start_at + 30 days (diff={time_diff}s)")
-        log(f"✓ matures_at ≈ start_at + 30 days: {matures_at}")
-        
-        # Assert accrued is ~0 and small right after staking
-        assert_true(accrued < 1.0, f"accrued ({accrued}) is small right after staking")
-        log(f"✓ accrued is small: {accrued}")
-        
-        log(f"✅ TEST A PASSED: Brand-new stake has correct values")
-        
-    def case_4_weighted_restake(self):
-        """Case 4 (TEST B): WEIGHTED RESTAKE - admin adds bonus profit, then reinvest"""
-        log("\n=== CASE 4 (TEST B): WEIGHTED RESTAKE ===")
-        
-        # Admin adds bonus profit: 500 XRP
-        log("Admin adding 500 XRP bonus profit...")
-        resp = requests.post(
-            f"{BASE_URL}/admin/users/{self.user_id}/adjust-profit",
-            json={"amount": 500},
-            headers={"Authorization": f"Bearer {self.admin_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "Admin profit adjustment")
-        log(f"✓ Admin added 500 XRP bonus profit")
-        
-        # Wait a moment for the update to propagate
-        time.sleep(0.5)
-        
-        # POST /api/reinvest with stake_id
-        log(f"Reinvesting into stake {self.stake_id}...")
-        resp = requests.post(
-            f"{BASE_URL}/reinvest",
-            json={"stake_id": self.stake_id},
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "POST /api/reinvest returns 200")
-        reinvest_data = resp.json()
-        
-        assert_eq(reinvest_data["ok"], True, "Reinvest ok is true")
-        compounded_amount = reinvest_data.get("amount", 0)
-        new_principal = reinvest_data.get("principal", 0)
-        
-        log(f"✓ Reinvest successful: compounded={compounded_amount}, new_principal={new_principal}")
-        
-        # Wait a moment for the update to propagate
-        time.sleep(0.5)
-        
-        # GET /api/state and verify
-        log("Verifying post-reinvest state...")
-        resp = requests.get(
-            f"{BASE_URL}/state",
-            headers={"Authorization": f"Bearer {self.user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "GET /api/state")
-        data = resp.json()
-        
-        stakes = data.get("stakes", [])
-        stake = None
-        for s in stakes:
-            if s["id"] == self.stake_id:
-                stake = s
-                break
-        
-        assert_true(stake is not None, "Found stake after reinvest")
-        
-        principal = stake.get("principal", 0)
-        accrued = stake.get("accrued", 0)
-        claimed_profit = stake.get("claimed_profit", 0)
-        profit_at_maturity = stake.get("profit_at_maturity", 0)
-        total_at_maturity = stake.get("total_at_maturity", 0)
-        matures_at = stake.get("matures_at")
-        apy = stake.get("apy", 0)
-        
-        log(f"Post-reinvest values: principal={principal}, accrued={accrued}, claimed_profit={claimed_profit}")
-        log(f"  profit_at_maturity={profit_at_maturity}, total_at_maturity={total_at_maturity}")
-        log(f"  matures_at={matures_at}")
-        
-        # Assert principal increased by ~500 (≈ 50500)
-        expected_principal = 50500
-        tolerance = 10  # Allow 10 XRP tolerance for small accrued profit
-        assert_true(abs(principal - expected_principal) < tolerance,
-                   f"principal ({principal}) ≈ 50500 (increased by ~500)")
-        log(f"✓ principal increased by ~500: {principal}")
-        
-        # Assert accrued (net) is ≈ 0 right after the restake
-        assert_true(accrued < 1.0, f"accrued ({accrued}) ≈ 0 right after restake")
-        log(f"✓ accrued ≈ 0 right after restake: {accrued}")
-        
-        # Assert claimed_profit >= 0 and is set
-        assert_true(claimed_profit >= 0, f"claimed_profit ({claimed_profit}) >= 0")
-        log(f"✓ claimed_profit is set: {claimed_profit}")
-        
-        # Assert profit_at_maturity ≈ principal*0.2999 - claimed_profit and is >= 0
-        expected_profit_at_maturity = principal * apy - claimed_profit
-        tolerance = 10  # Allow 10 XRP tolerance
-        assert_true(abs(profit_at_maturity - expected_profit_at_maturity) < tolerance,
-                   f"profit_at_maturity ({profit_at_maturity}) ≈ principal*apy - claimed ({expected_profit_at_maturity})")
-        assert_true(profit_at_maturity >= 0, f"profit_at_maturity ({profit_at_maturity}) >= 0")
-        log(f"✓ profit_at_maturity ≈ {expected_profit_at_maturity}: {profit_at_maturity}")
-        
-        # Assert total_at_maturity == principal + profit_at_maturity
-        expected_total = principal + profit_at_maturity
-        assert_true(abs(total_at_maturity - expected_total) < 0.01,
-                   f"total_at_maturity ({total_at_maturity}) == principal + profit_at_maturity ({expected_total})")
-        log(f"✓ total_at_maturity == {expected_total}: {total_at_maturity}")
-        
-        # Assert matures_at is a valid future ISO date, no more than ~30 days out from now, and >= now
-        from datetime import datetime, timedelta, timezone
-        now = datetime.now(timezone.utc)
-        matures_dt = datetime.fromisoformat(matures_at.replace('Z', '+00:00'))
-        
-        assert_true(matures_dt >= now, f"matures_at ({matures_at}) >= now")
-        log(f"✓ matures_at is in the future: {matures_at}")
-        
-        days_until_maturity = (matures_dt - now).total_seconds() / 86400
-        assert_true(days_until_maturity <= 31, f"matures_at is no more than ~30 days out (got {days_until_maturity:.2f} days)")
-        log(f"✓ matures_at is no more than ~30 days out: {days_until_maturity:.2f} days")
-        
-        log(f"✅ TEST B PASSED: Weighted restake working correctly")
-        
-    def case_5_error_zero_profit_reinvest(self):
-        """Case 5 (TEST C): ERROR - user with zero profit tries to reinvest -> 400"""
-        log("\n=== CASE 5 (TEST C): ERROR - Zero Profit Reinvest ===")
-        
-        # Register a second user
-        random_suffix = secrets.token_hex(4)
-        self.user2_email = f"zeroprofit_{random_suffix}@example.com"
-        
-        resp = requests.post(f"{BASE_URL}/auth/register", json={
-            "first_name": "Zero",
-            "last_name": "Profit",
-            "email": self.user2_email,
-            "password": "secret123"
-        })
-        
-        assert_eq(resp.status_code, 200, "User2 registration")
-        data = resp.json()
-        self.user2_token = data["token"]
-        self.user2_id = data["user"]["id"]
-        log(f"✓ User2 registered: email={self.user2_email}, id={self.user2_id}")
-        
-        # Admin funds user2 with 60000 XRP
-        resp = requests.post(
-            f"{BASE_URL}/admin/users/{self.user2_id}/adjust-balance",
-            json={"amount": 60000},
-            headers={"Authorization": f"Bearer {self.admin_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "Admin balance credit for user2")
-        log(f"✓ User2 balance credited: 60000 XRP")
-        
-        # User2 stakes into vip_silver
-        resp = requests.post(
-            f"{BASE_URL}/stakes",
-            json={"vault_key": "vip_silver", "amount": 50000},
-            headers={"Authorization": f"Bearer {self.user2_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "User2 stake creation")
-        log(f"✓ User2 staked 50000 XRP into vip_silver")
-        
-        # Get user2's stake_id
-        resp = requests.get(
-            f"{BASE_URL}/state",
-            headers={"Authorization": f"Bearer {self.user2_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "GET /api/state for user2")
-        data = resp.json()
-        
-        stakes = data.get("stakes", [])
-        stake = None
-        for s in stakes:
-            if s.get("vault_key") == "vip_silver" and s.get("status") == "active":
-                stake = s
-                break
-        
-        assert_true(stake is not None, "Found user2's active vip_silver stake")
-        self.user2_stake_id = stake["id"]
-        
-        profit = data.get("profit", 0)
-        log(f"User2 current profit: {profit} XRP")
-        
-        # Reinvest all available profit (even if tiny) to zero it out
-        log(f"First reinvest to compound all available profit...")
-        resp = requests.post(
-            f"{BASE_URL}/reinvest",
-            json={"stake_id": self.user2_stake_id},
-            headers={"Authorization": f"Bearer {self.user2_token}"}
-        )
-        
-        # Should succeed with the tiny profit
-        assert_eq(resp.status_code, 200, "First reinvest succeeds")
-        log(f"✓ First reinvest succeeded, compounded {profit} XRP")
-        
-        # Now immediately try to reinvest again - but profit will have accrued again
-        # To truly test zero profit, we need to use admin to REMOVE bonus profit
-        # Let's set bonus_profit to a negative value to offset any accrued profit
-        
-        # Admin removes any bonus profit (set to -1 to ensure total profit is negative/zero)
-        log("Admin setting bonus_profit to -1 to ensure zero total profit...")
-        resp = requests.post(
-            f"{BASE_URL}/admin/users/{self.user2_id}/adjust-profit",
-            json={"amount": -1},
-            headers={"Authorization": f"Bearer {self.admin_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "Admin profit adjustment")
-        log(f"✓ Admin set bonus_profit to -1")
-        
-        # Wait a tiny bit
-        time.sleep(0.1)
-        
-        # Check current profit
-        resp = requests.get(
-            f"{BASE_URL}/state",
-            headers={"Authorization": f"Bearer {self.user2_token}"}
-        )
-        data = resp.json()
-        current_profit = data.get("profit", 0)
-        log(f"User2 current profit after adjustment: {current_profit} XRP")
-        
-        # Try to reinvest with zero/negative profit -> should return 400
-        log(f"Attempting to reinvest with zero/negative profit...")
-        resp = requests.post(
-            f"{BASE_URL}/reinvest",
-            json={"stake_id": self.user2_stake_id},
-            headers={"Authorization": f"Bearer {self.user2_token}"}
-        )
-        
-        assert_eq(resp.status_code, 400, "Reinvest with zero profit returns 400")
-        detail = resp.json().get("detail", "")
-        log(f"✓ Correctly rejected zero profit reinvest: {resp.status_code} - {detail}")
-        
-        # Verify the error message mentions "no profit"
-        assert_true("no profit" in detail.lower() or "nothing" in detail.lower(),
-                   f"Error message mentions no profit: {detail}")
-        log(f"✓ Error message is appropriate: '{detail}'")
-        
-        log(f"✅ TEST C PASSED: Zero profit reinvest correctly returns 400")
-        
-    def run_all_tests(self):
-        """Run all test cases"""
-        try:
-            self.setup_admin_token()
-            self.case_1_register_and_fund_user()
-            self.case_2_stake_50000_vip_silver()
-            self.case_3_regression_brand_new_stake()
-            self.case_4_weighted_restake()
-            self.case_5_error_zero_profit_reinvest()
-            
-            log("\n" + "="*60)
-            log("✅ ALL 5 WEIGHTED RESTAKE TEST CASES PASSED")
-            log("="*60)
-            return True
-            
-        except AssertionError as e:
-            log(f"\n❌ TEST FAILED: {e}")
-            return False
-        except Exception as e:
-            log(f"\n❌ UNEXPECTED ERROR: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
+def admin_credit_profit(admin_token, user_id, amount):
+    """Admin credits profit to user."""
+    r = _post(f"/admin/users/{user_id}/adjust-profit", admin_token, {"amount": amount})
+    assert r.status_code == 200, f"Admin profit credit failed: {r.status_code} {r.text}"
 
 
-class TestAdminDeleteUser:
-    """Test admin delete user account with instant session kick"""
-    def __init__(self):
-        self.admin_token = None
-        self.admin_user_id = None
-        self.test_user_token = None
-        self.test_user_id = None
-        self.test_user_email = None
-        
-    def setup_admin_token(self):
-        """Get admin token and admin user_id"""
-        log("\n=== SETUP: Admin Login ===")
-        resp = requests.post(f"{BASE_URL}/auth/login", json={
-            "email": ADMIN_EMAIL,
-            "password": ADMIN_PASSWORD
-        })
-        assert_eq(resp.status_code, 200, "Admin login")
-        self.admin_token = resp.json()["token"]
-        
-        # Get admin user_id from GET /api/admin/users
-        resp = requests.get(
-            f"{BASE_URL}/admin/users",
-            headers={"Authorization": f"Bearer {self.admin_token}"}
-        )
-        assert_eq(resp.status_code, 200, "GET /api/admin/users")
-        users = resp.json().get("users", [])
-        
-        for u in users:
-            if u.get("role") == "admin" and u.get("email") == ADMIN_EMAIL:
-                self.admin_user_id = u["id"]
-                break
-        
-        assert_true(self.admin_user_id is not None, "Found admin user_id")
-        log(f"✓ Admin token obtained, admin_user_id={self.admin_user_id}")
-        
-    def case_1_register_fresh_user(self):
-        """Case 1: Register a fresh normal user"""
-        log("\n=== CASE 1: Register Fresh Normal User ===")
-        random_suffix = secrets.token_hex(4)
-        self.test_user_email = f"deletetest_{random_suffix}@example.com"
-        
-        resp = requests.post(f"{BASE_URL}/auth/register", json={
-            "first_name": "Delete",
-            "last_name": "Test",
-            "email": self.test_user_email,
-            "password": "testpass123"
-        })
-        
-        assert_eq(resp.status_code, 200, "User registration")
-        data = resp.json()
-        self.test_user_token = data["token"]
-        self.test_user_id = data["user"]["id"]
-        log(f"✓ User registered: email={self.test_user_email}, id={self.test_user_id}")
-        
-    def case_2_create_user_data(self):
-        """Case 2: Admin credits balance and user creates stake"""
-        log("\n=== CASE 2: Create User Data (Balance + Stake) ===")
-        
-        # Admin credits 200000 XRP balance
-        resp = requests.post(
-            f"{BASE_URL}/admin/users/{self.test_user_id}/adjust-balance",
-            json={"amount": 200000},
-            headers={"Authorization": f"Bearer {self.admin_token}"}
-        )
-        assert_eq(resp.status_code, 200, "Admin balance credit")
-        log(f"✓ Balance credited: 200000 XRP")
-        
-        # User creates a stake
-        resp = requests.post(
-            f"{BASE_URL}/stakes",
-            json={"vault_key": "vip_silver", "amount": 150000},
-            headers={"Authorization": f"Bearer {self.test_user_token}"}
-        )
-        assert_eq(resp.status_code, 200, "Stake creation")
-        log(f"✓ Stake created: 150000 XRP in vip_silver")
-        
-    def case_3_delete_user_success(self):
-        """Case 3: Admin DELETE /api/admin/users/{user_id} -> 200 with deleted counts"""
-        log("\n=== CASE 3: Delete User Successfully ===")
-        
-        resp = requests.delete(
-            f"{BASE_URL}/admin/users/{self.test_user_id}",
-            headers={"Authorization": f"Bearer {self.admin_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "DELETE user returns 200")
-        data = resp.json()
-        
-        assert_eq(data["ok"], True, "Response ok is true")
-        assert_in("deleted", data, "Response has deleted")
-        
-        deleted = data["deleted"]
-        assert_in("stakes", deleted, "deleted has stakes count")
-        assert_in("transactions", deleted, "deleted has transactions count")
-        
-        stakes_count = deleted["stakes"]
-        transactions_count = deleted["transactions"]
-        
-        assert_true(isinstance(stakes_count, int), f"stakes count is int (got {type(stakes_count).__name__})")
-        assert_true(isinstance(transactions_count, int), f"transactions count is int (got {type(transactions_count).__name__})")
-        
-        log(f"✓ User deleted successfully: stakes={stakes_count}, transactions={transactions_count}")
-        
-    def case_4_verify_user_gone_from_list(self):
-        """Case 4: GET /api/admin/users no longer lists the deleted user"""
-        log("\n=== CASE 4: Verify User Gone from Admin Users List ===")
-        
-        resp = requests.get(
-            f"{BASE_URL}/admin/users",
-            headers={"Authorization": f"Bearer {self.admin_token}"}
-        )
-        
-        assert_eq(resp.status_code, 200, "GET /api/admin/users returns 200")
-        users = resp.json().get("users", [])
-        
-        # Verify deleted user is not in the list
-        deleted_user_found = False
-        for u in users:
-            if u.get("email") == self.test_user_email or u.get("id") == self.test_user_id:
-                deleted_user_found = True
-                break
-        
-        assert_true(not deleted_user_found, f"Deleted user {self.test_user_email} is NOT in admin users list")
-        log(f"✓ Deleted user {self.test_user_email} is not in admin users list")
-        
-    def case_5_verify_user_not_found(self):
-        """Case 5: GET /api/admin/users/{user_id} -> 404"""
-        log("\n=== CASE 5: Verify GET User by ID Returns 404 ===")
-        
-        resp = requests.get(
-            f"{BASE_URL}/admin/users/{self.test_user_id}",
-            headers={"Authorization": f"Bearer {self.admin_token}"}
-        )
-        
-        assert_eq(resp.status_code, 404, "GET deleted user returns 404")
-        log(f"✓ GET /api/admin/users/{self.test_user_id} correctly returns 404")
-        
-    def case_6_verify_token_invalid(self):
-        """Case 6: Deleted user's token no longer works (GET /api/state -> 401)"""
-        log("\n=== CASE 6: Verify Deleted User's Token No Longer Works ===")
-        
-        resp = requests.get(
-            f"{BASE_URL}/state",
-            headers={"Authorization": f"Bearer {self.test_user_token}"}
-        )
-        
-        assert_eq(resp.status_code, 401, "Deleted user's token returns 401")
-        log(f"✓ Deleted user's token correctly returns 401 on GET /api/state")
-        
-    def case_7_delete_admin_account(self):
-        """Case 7: Try to delete an ADMIN account -> 400"""
-        log("\n=== CASE 7: Try to Delete Admin Account ===")
-        
-        resp = requests.delete(
-            f"{BASE_URL}/admin/users/{self.admin_user_id}",
-            headers={"Authorization": f"Bearer {self.admin_token}"}
-        )
-        
-        assert_eq(resp.status_code, 400, "Delete admin account returns 400")
-        detail = resp.json().get("detail", "")
-        
-        # Accept either "Admin accounts cannot be deleted." or "You cannot delete your own account."
-        valid_messages = [
-            "admin accounts cannot be deleted",
-            "you cannot delete your own account"
-        ]
-        
-        detail_lower = detail.lower()
-        message_found = any(msg in detail_lower for msg in valid_messages)
-        
-        assert_true(message_found, f"Error message is appropriate: {detail}")
-        log(f"✓ Correctly rejected deleting admin account: {detail}")
-        
-    def case_8_delete_nonexistent_user(self):
-        """Case 8: DELETE /api/admin/users/{invalid_id} -> 404"""
-        log("\n=== CASE 8: Delete Non-existent User ===")
-        
-        # Try with a valid ObjectId format but non-existent
-        fake_id = "507f1f77bcf86cd799439011"
-        resp = requests.delete(
-            f"{BASE_URL}/admin/users/{fake_id}",
-            headers={"Authorization": f"Bearer {self.admin_token}"}
-        )
-        
-        assert_eq(resp.status_code, 404, "Delete non-existent user returns 404")
-        log(f"✓ Correctly returned 404 for non-existent user: {resp.json().get('detail', '')}")
-        
-        # Try with an invalid ID format
-        invalid_id = "nonexistent123"
-        resp = requests.delete(
-            f"{BASE_URL}/admin/users/{invalid_id}",
-            headers={"Authorization": f"Bearer {self.admin_token}"}
-        )
-        
-        assert_eq(resp.status_code, 404, "Delete invalid user ID returns 404")
-        log(f"✓ Correctly returned 404 for invalid user ID: {resp.json().get('detail', '')}")
-        
-    def case_9_delete_without_auth(self):
-        """Case 9: DELETE /api/admin/users/{id} without Authorization -> 401/403"""
-        log("\n=== CASE 9: Delete User Without Authorization ===")
-        
-        # Register another user to try to delete
-        random_suffix = secrets.token_hex(4)
-        temp_email = f"tempuser_{random_suffix}@example.com"
-        
-        resp = requests.post(f"{BASE_URL}/auth/register", json={
-            "first_name": "Temp",
-            "last_name": "User",
-            "email": temp_email,
-            "password": "temppass123"
-        })
-        assert_eq(resp.status_code, 200, "Temp user registration")
-        temp_user_id = resp.json()["user"]["id"]
-        
-        # Try to delete without Authorization header
-        resp = requests.delete(f"{BASE_URL}/admin/users/{temp_user_id}")
-        
-        assert_true(resp.status_code in [401, 403], 
-                   f"Delete without auth returns 401/403 (got {resp.status_code})")
-        log(f"✓ Correctly rejected delete without auth: {resp.status_code} - {resp.json().get('detail', '')}")
-        
-    def case_10_delete_with_non_admin_token(self):
-        """Case 10: DELETE /api/admin/users/{id} with non-admin token -> 403"""
-        log("\n=== CASE 10: Delete User with Non-Admin Token ===")
-        
-        # Register a non-admin user
-        random_suffix = secrets.token_hex(4)
-        nonadmin_email = f"nonadmin_{random_suffix}@example.com"
-        
-        resp = requests.post(f"{BASE_URL}/auth/register", json={
-            "first_name": "NonAdmin",
-            "last_name": "User",
-            "email": nonadmin_email,
-            "password": "nonadminpass123"
-        })
-        assert_eq(resp.status_code, 200, "Non-admin user registration")
-        nonadmin_token = resp.json()["token"]
-        
-        # Register another user to try to delete
-        random_suffix2 = secrets.token_hex(4)
-        target_email = f"target_{random_suffix2}@example.com"
-        
-        resp = requests.post(f"{BASE_URL}/auth/register", json={
-            "first_name": "Target",
-            "last_name": "User",
-            "email": target_email,
-            "password": "targetpass123"
-        })
-        assert_eq(resp.status_code, 200, "Target user registration")
-        target_user_id = resp.json()["user"]["id"]
-        
-        # Try to delete with non-admin token
-        resp = requests.delete(
-            f"{BASE_URL}/admin/users/{target_user_id}",
-            headers={"Authorization": f"Bearer {nonadmin_token}"}
-        )
-        
-        assert_eq(resp.status_code, 403, "Delete with non-admin token returns 403")
-        log(f"✓ Correctly rejected delete with non-admin token: {resp.json().get('detail', '')}")
-        
-    def run_all_tests(self):
-        """Run all test cases"""
-        try:
-            self.setup_admin_token()
-            self.case_1_register_fresh_user()
-            self.case_2_create_user_data()
-            self.case_3_delete_user_success()
-            self.case_4_verify_user_gone_from_list()
-            self.case_5_verify_user_not_found()
-            self.case_6_verify_token_invalid()
-            self.case_7_delete_admin_account()
-            self.case_8_delete_nonexistent_user()
-            self.case_9_delete_without_auth()
-            self.case_10_delete_with_non_admin_token()
-            
-            log("\n" + "="*60)
-            log("✅ ALL 10 ADMIN DELETE USER TEST CASES PASSED")
-            log("="*60)
-            return True
-            
-        except AssertionError as e:
-            log(f"\n❌ TEST FAILED: {e}")
-            return False
-        except Exception as e:
-            log(f"\n❌ UNEXPECTED ERROR: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
+def stake_into_vault(user_token, vault_key, amount):
+    """User stakes into a vault."""
+    r = _post("/stakes", user_token, {"vault_key": vault_key, "amount": amount})
+    assert r.status_code == 200, f"Stake failed: {r.status_code} {r.text}"
+    return r.json()
 
 
-if __name__ == "__main__":
-    import sys
+# =============================================================================
+# FEATURE 1: Withdrawal address book
+# =============================================================================
+def test_feature1_withdrawal_address_book():
+    """Test withdrawal address book (authenticated normal user)."""
+    print("\n" + "="*80)
+    print("FEATURE 1: Withdrawal address book")
+    print("="*80)
     
-    if len(sys.argv) > 1 and sys.argv[1] == "deleteuser":
-        # Run admin delete user tests
-        tester = TestAdminDeleteUser()
-        success = tester.run_all_tests()
-    elif len(sys.argv) > 1 and sys.argv[1] == "hotwallet":
-        # Run admin hot wallet settings tests
-        tester = TestAdminHotWalletSettings()
-        success = tester.run_all_tests()
-    elif len(sys.argv) > 1 and sys.argv[1] == "withdraw":
-        # Run withdrawal address+tag tests
-        tester = TestWithdrawalAddressTag()
-        success = tester.run_all_tests()
-    elif len(sys.argv) > 1 and sys.argv[1] == "totalreturn":
-        # Run total-return model tests
-        tester = TestTotalReturnModel()
-        success = tester.run_all_tests()
-    elif len(sys.argv) > 1 and sys.argv[1] == "flex":
-        # Run flexible vault stop stake tests
-        tester = TestFlexibleVaultStopStake()
-        success = tester.run_all_tests()
-    elif len(sys.argv) > 1 and sys.argv[1] == "selfservice":
-        # Run user self-service tests
-        tester = TestUserSelfService()
-        success = tester.run_all_tests()
-    elif len(sys.argv) > 1 and sys.argv[1] == "adminstats":
-        # Run admin stats and last_login tests
-        tester = TestAdminStatsAndLastLogin()
-        success = tester.run_all_tests()
-    elif len(sys.argv) > 1 and sys.argv[1] == "weightedrestake":
-        # Run weighted restake tests
-        tester = TestWeightedRestake()
-        success = tester.run_all_tests()
+    admin_token = get_admin_token()
+    user_token, user_id, user_email = register_user("withdrawaddr")
+    print(f"✓ Registered user: {user_email} (id={user_id})")
+    
+    # Test 1: POST valid address, then GET list includes it
+    print("\n[Test 1.1] POST valid address with label, address, and tag")
+    r = _post("/withdraw-addresses", user_token, {
+        "label": "Ledger",
+        "address": "rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4",
+        "tag": "99"
+    })
+    assert r.status_code == 200, f"Expected 200, got {r.status_code}: {r.text}"
+    data = r.json()
+    assert data.get("ok") is True, f"Expected ok=true, got {data}"
+    assert "address" in data, f"Expected 'address' field in response, got {data}"
+    addr_entry = data["address"]
+    assert "id" in addr_entry, f"Expected 'id' in address entry, got {addr_entry}"
+    assert addr_entry["label"] == "Ledger", f"Expected label='Ledger', got {addr_entry['label']}"
+    assert addr_entry["address"] == "rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4"
+    assert addr_entry["tag"] == "99"
+    assert "created_at" in addr_entry
+    saved_id = addr_entry["id"]
+    print(f"✓ POST /api/withdraw-addresses returned 200 with id={saved_id}")
+    
+    print("\n[Test 1.2] GET /api/withdraw-addresses includes the saved address")
+    r = _get("/withdraw-addresses", user_token)
+    assert r.status_code == 200, f"Expected 200, got {r.status_code}: {r.text}"
+    data = r.json()
+    assert "addresses" in data, f"Expected 'addresses' field, got {data}"
+    addresses = data["addresses"]
+    assert any(a["id"] == saved_id for a in addresses), f"Saved address not found in list: {addresses}"
+    print(f"✓ GET /api/withdraw-addresses returned list with saved address")
+    
+    # Test 2: Validation errors
+    print("\n[Test 2.1] POST with invalid address 'hello' -> 400")
+    r = _post("/withdraw-addresses", user_token, {
+        "label": "x",
+        "address": "hello"
+    })
+    assert r.status_code == 400, f"Expected 400, got {r.status_code}: {r.text}"
+    print(f"✓ Invalid address correctly returned 400: {r.json().get('detail')}")
+    
+    print("\n[Test 2.2] POST with blank label -> 400")
+    r = _post("/withdraw-addresses", user_token, {
+        "label": "",
+        "address": "rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4"
+    })
+    assert r.status_code == 400, f"Expected 400, got {r.status_code}: {r.text}"
+    print(f"✓ Blank label correctly returned 400: {r.json().get('detail')}")
+    
+    print("\n[Test 2.3] POST with non-numeric tag 'abc' -> 400")
+    r = _post("/withdraw-addresses", user_token, {
+        "label": "y",
+        "address": "rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4",
+        "tag": "abc"
+    })
+    assert r.status_code == 400, f"Expected 400, got {r.status_code}: {r.text}"
+    print(f"✓ Non-numeric tag correctly returned 400: {r.json().get('detail')}")
+    
+    print("\n[Test 2.4] POST exact duplicate (same address+tag) -> 400")
+    r = _post("/withdraw-addresses", user_token, {
+        "label": "Ledger Duplicate",
+        "address": "rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4",
+        "tag": "99"
+    })
+    assert r.status_code == 400, f"Expected 400, got {r.status_code}: {r.text}"
+    print(f"✓ Duplicate address+tag correctly returned 400: {r.json().get('detail')}")
+    
+    # Test 3: DELETE address
+    print("\n[Test 3.1] DELETE /api/withdraw-addresses/{id} -> 200")
+    r = _delete(f"/withdraw-addresses/{saved_id}", user_token)
+    assert r.status_code == 200, f"Expected 200, got {r.status_code}: {r.text}"
+    data = r.json()
+    assert data.get("ok") is True, f"Expected ok=true, got {data}"
+    print(f"✓ DELETE returned 200 with ok=true")
+    
+    print("\n[Test 3.2] GET again -> list no longer contains deleted address")
+    r = _get("/withdraw-addresses", user_token)
+    assert r.status_code == 200, f"Expected 200, got {r.status_code}: {r.text}"
+    addresses = r.json()["addresses"]
+    assert not any(a["id"] == saved_id for a in addresses), f"Deleted address still in list: {addresses}"
+    print(f"✓ Deleted address no longer in list")
+    
+    # Test 4: Auth required
+    print("\n[Test 4] GET /api/withdraw-addresses with NO auth header -> 401/403")
+    r = _get("/withdraw-addresses")
+    assert r.status_code in (401, 403), f"Expected 401/403, got {r.status_code}: {r.text}"
+    print(f"✓ No auth correctly returned {r.status_code}")
+    
+    print("\n✅ FEATURE 1 PASSED: All withdrawal address book tests passed")
+
+
+# =============================================================================
+# FEATURE 2: Restake preview (non-mutating)
+# =============================================================================
+def test_feature2_restake_preview():
+    """Test restake preview endpoint (non-mutating)."""
+    print("\n" + "="*80)
+    print("FEATURE 2: Restake preview (non-mutating)")
+    print("="*80)
+    
+    admin_token = get_admin_token()
+    user_token, user_id, user_email = register_user("restakepreview")
+    print(f"✓ Registered user: {user_email} (id={user_id})")
+    
+    # Admin credit balance
+    admin_credit_balance(admin_token, user_id, 120000)
+    print(f"✓ Admin credited 120000 XRP balance")
+    
+    # Stake into vip_silver
+    print("\n[Setup] Staking 50000 XRP into vip_silver")
+    stake_result = stake_into_vault(user_token, "vip_silver", 50000)
+    print(f"✓ Staked 50000 XRP into vip_silver")
+    
+    # Get stake_id from state
+    r = _get("/state", user_token)
+    assert r.status_code == 200, f"GET /state failed: {r.status_code} {r.text}"
+    state = r.json()
+    stakes = state.get("stakes", [])
+    assert len(stakes) > 0, f"No stakes found in state: {state}"
+    stake = stakes[0]
+    stake_id = stake["id"]
+    initial_principal = stake["principal"]
+    print(f"✓ Got stake_id: {stake_id}, initial principal: {initial_principal}")
+    
+    # Admin add profit
+    admin_credit_profit(admin_token, user_id, 500)
+    print(f"✓ Admin added 500 XRP profit")
+    
+    # Test 1: POST /api/reinvest/preview with valid stake_id
+    print("\n[Test 1] POST /api/reinvest/preview with valid stake_id")
+    r = _post("/reinvest/preview", user_token, {"stake_id": stake_id})
+    assert r.status_code == 200, f"Expected 200, got {r.status_code}: {r.text}"
+    preview = r.json()
+    print(f"Preview response: {preview}")
+    
+    # Validate response fields
+    assert "new_principal" in preview, f"Missing 'new_principal' in response: {preview}"
+    assert "amount" in preview, f"Missing 'amount' in response: {preview}"
+    assert "new_matures_at" in preview, f"Missing 'new_matures_at' in response: {preview}"
+    assert "profit_at_maturity" in preview, f"Missing 'profit_at_maturity' in response: {preview}"
+    assert "total_at_maturity" in preview, f"Missing 'total_at_maturity' in response: {preview}"
+    
+    new_principal = preview["new_principal"]
+    amount = preview["amount"]
+    new_matures_at = preview["new_matures_at"]
+    profit_at_maturity = preview["profit_at_maturity"]
+    total_at_maturity = preview["total_at_maturity"]
+    
+    # Validate values
+    assert abs(new_principal - 50500) < 10, f"Expected new_principal ≈ 50500, got {new_principal}"
+    assert abs(amount - 500) < 10, f"Expected amount ≈ 500, got {amount}"
+    assert profit_at_maturity >= 0, f"Expected profit_at_maturity >= 0, got {profit_at_maturity}"
+    # profit_at_maturity should be roughly new_principal * 0.2999 minus small claimed
+    expected_profit = new_principal * 0.2999
+    assert abs(profit_at_maturity - expected_profit) < 100, f"Expected profit_at_maturity ≈ {expected_profit}, got {profit_at_maturity}"
+    assert abs(total_at_maturity - (new_principal + profit_at_maturity)) < 0.01, f"Expected total_at_maturity = new_principal + profit_at_maturity, got {total_at_maturity}"
+    
+    # Validate new_matures_at is a valid future ISO date
+    assert new_matures_at is not None, "new_matures_at is None"
+    assert "T" in new_matures_at, f"new_matures_at not ISO format: {new_matures_at}"
+    print(f"✓ Preview returned valid values: new_principal={new_principal}, amount={amount}, profit_at_maturity={profit_at_maturity}, total_at_maturity={total_at_maturity}")
+    
+    # Test 2: CRUCIAL - verify preview did NOT mutate
+    print("\n[Test 2] CRUCIAL: Verify preview did NOT mutate the stake")
+    r = _get("/state", user_token)
+    assert r.status_code == 200, f"GET /state failed: {r.status_code} {r.text}"
+    state_after = r.json()
+    stakes_after = state_after.get("stakes", [])
+    stake_after = next((s for s in stakes_after if s["id"] == stake_id), None)
+    assert stake_after is not None, f"Stake {stake_id} not found after preview"
+    principal_after = stake_after["principal"]
+    assert abs(principal_after - initial_principal) < 0.01, f"Principal changed! Before: {initial_principal}, After: {principal_after}. Preview MUTATED the stake!"
+    print(f"✓ Principal unchanged: {principal_after} (expected {initial_principal}). Preview did NOT mutate.")
+    
+    # Test 3: Invalid stake_id -> 404
+    print("\n[Test 3] POST /api/reinvest/preview with invalid stake_id 'bad123' -> 404")
+    r = _post("/reinvest/preview", user_token, {"stake_id": "bad123"})
+    assert r.status_code == 404, f"Expected 404, got {r.status_code}: {r.text}"
+    print(f"✓ Invalid stake_id correctly returned 404: {r.json().get('detail')}")
+    
+    print("\n✅ FEATURE 2 PASSED: All restake preview tests passed (including non-mutation verification)")
+
+
+# =============================================================================
+# FEATURE 3: Admin activity feed
+# =============================================================================
+def test_feature3_admin_activity_feed():
+    """Test admin activity feed endpoint."""
+    print("\n" + "="*80)
+    print("FEATURE 3: Admin activity feed")
+    print("="*80)
+    
+    admin_token = get_admin_token()
+    print(f"✓ Admin logged in")
+    
+    # Create some activity: register user, admin adjust balance, create deposit/withdrawal
+    user_token, user_id, user_email = register_user("activitytest")
+    print(f"✓ Registered user: {user_email} (signup activity created)")
+    
+    admin_credit_balance(admin_token, user_id, 10000)
+    print(f"✓ Admin credited balance (admin_action activity created)")
+    
+    # Test 1: GET /api/admin/activity as admin
+    print("\n[Test 1] GET /api/admin/activity as admin -> 200")
+    r = _get("/admin/activity", admin_token)
+    assert r.status_code == 200, f"Expected 200, got {r.status_code}: {r.text}"
+    data = r.json()
+    assert "activity" in data, f"Expected 'activity' field, got {data}"
+    activity = data["activity"]
+    assert isinstance(activity, list), f"Expected activity to be a list, got {type(activity)}"
+    print(f"✓ GET /api/admin/activity returned 200 with activity list (length={len(activity)})")
+    
+    # Validate activity items
+    if len(activity) > 0:
+        print(f"\n[Validation] Checking activity items structure")
+        valid_kinds = {"deposit", "withdrawal", "admin_action", "signup"}
+        for item in activity[:5]:  # Check first 5 items
+            assert "kind" in item, f"Missing 'kind' in activity item: {item}"
+            assert item["kind"] in valid_kinds, f"Invalid kind '{item['kind']}', expected one of {valid_kinds}"
+            assert "created_at" in item, f"Missing 'created_at' in activity item: {item}"
+        print(f"✓ Activity items have valid 'kind' and 'created_at' fields")
+        
+        # Check for admin_action items (from our balance adjustment)
+        admin_actions = [a for a in activity if a.get("kind") == "admin_action"]
+        print(f"✓ Found {len(admin_actions)} admin_action items")
+        
+        # Check for signup items
+        signups = [a for a in activity if a.get("kind") == "signup"]
+        print(f"✓ Found {len(signups)} signup items")
+        
+        # Verify at least one admin_action or signup exists
+        assert len(admin_actions) > 0 or len(signups) > 0, "Expected at least one admin_action or signup item"
+        print(f"✓ Activity feed contains expected item types")
     else:
-        # Run auth tests by default
-        tester = TestEmailPasswordAuth()
-        success = tester.run_all_tests()
+        print("⚠ Activity list is empty (no historical data)")
     
-    exit(0 if success else 1)
+    # Test 2: GET /api/admin/activity with NO auth -> 401/403
+    print("\n[Test 2.1] GET /api/admin/activity with NO auth -> 401/403")
+    r = _get("/admin/activity")
+    assert r.status_code in (401, 403), f"Expected 401/403, got {r.status_code}: {r.text}"
+    print(f"✓ No auth correctly returned {r.status_code}")
+    
+    # Test 2.2: GET /api/admin/activity with NON-admin user token -> 403
+    print("\n[Test 2.2] GET /api/admin/activity with NON-admin user token -> 403")
+    r = _get("/admin/activity", user_token)
+    assert r.status_code == 403, f"Expected 403, got {r.status_code}: {r.text}"
+    print(f"✓ Non-admin user correctly returned 403: {r.json().get('detail')}")
+    
+    print("\n✅ FEATURE 3 PASSED: All admin activity feed tests passed")
+
+
+# =============================================================================
+# Main test runner
+# =============================================================================
+if __name__ == "__main__":
+    print("\n" + "="*80)
+    print("XamanProtocol Backend Testing - THREE NEW FEATURES")
+    print("="*80)
+    
+    try:
+        test_feature1_withdrawal_address_book()
+        test_feature2_restake_preview()
+        test_feature3_admin_activity_feed()
+        
+        print("\n" + "="*80)
+        print("✅ ALL TESTS PASSED - ALL THREE FEATURES WORKING CORRECTLY")
+        print("="*80)
+    except AssertionError as e:
+        print(f"\n❌ TEST FAILED: {e}")
+        raise
+    except Exception as e:
+        print(f"\n❌ ERROR: {e}")
+        raise

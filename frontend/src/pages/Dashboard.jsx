@@ -7,7 +7,7 @@ import { api, apiError } from "@/lib/api";
 import { LiveProfit } from "@/components/LiveProfit";
 import { Countdown } from "@/components/Countdown";
 import { ensureNotifyPermission } from "@/lib/notify";
-import { fmtXRP, xrpToUsdLabel, TIER_META } from "@/lib/format";
+import { fmtXRP, xrpToUsdLabel, TIER_META, fmtDate } from "@/lib/format";
 import { motion } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
@@ -19,12 +19,26 @@ import {
 function ReinvestDialog({ open, onClose, profit, stakes = [], onDone }) {
   const [selected, setSelected] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const { rate } = usePrice();
 
   useEffect(() => {
     if (!open) return;
     setSelected(stakes[0] || null);
   }, [open, stakes]);
+
+  // Fetch an exact preview (new maturity date + payout) whenever the target stake changes.
+  useEffect(() => {
+    if (!open || !selected || profit <= 0) { setPreview(null); return; }
+    let cancelled = false;
+    setPreviewLoading(true);
+    api.post("/reinvest/preview", { stake_id: selected.id })
+      .then(({ data }) => { if (!cancelled) setPreview(data); })
+      .catch(() => { if (!cancelled) setPreview(null); })
+      .finally(() => { if (!cancelled) setPreviewLoading(false); });
+    return () => { cancelled = true; };
+  }, [open, selected, profit]);
 
   const confirm = async () => {
     if (!selected) return;
@@ -40,8 +54,6 @@ function ReinvestDialog({ open, onClose, profit, stakes = [], onDone }) {
       setBusy(false);
     }
   };
-
-  const projected = (selected?.principal || 0) + (profit || 0);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -69,10 +81,35 @@ function ReinvestDialog({ open, onClose, profit, stakes = [], onDone }) {
               </div>
             )}
             {selected && profit > 0 && (
-              <p className="text-xs text-slate-400 mt-2">
-                New stake balance ≈ <span className="font-semibold text-slate-600">{fmtXRP(projected)} XRP</span>
-                {selected.duration_days ? <> · the {selected.duration_days}-day term restarts from now</> : null}.
-              </p>
+              <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3.5 space-y-2" data-testid="reinvest-preview">
+                {previewLoading && !preview ? (
+                  <div className="flex items-center gap-2 text-xs text-slate-400 py-1"><Loader2 className="animate-spin" size={14} /> Calculating your new terms…</div>
+                ) : preview ? (
+                  <>
+                    <PreviewRow label="New stake balance" value={`${fmtXRP(preview.new_principal)} XRP`} testid="preview-new-principal" strong />
+                    {preview.new_matures_at && (
+                      <PreviewRow
+                        label="New maturity date"
+                        value={fmtDate(preview.new_matures_at)}
+                        sub={preview.current_matures_at ? `was ${fmtDate(preview.current_matures_at)}` : null}
+                        testid="preview-matures-at"
+                      />
+                    )}
+                    <PreviewRow label="Profit at maturity" value={`+${fmtXRP(preview.profit_at_maturity)} XRP`} testid="preview-profit" accent="#059669" />
+                    <PreviewRow
+                      label="Total paid out"
+                      value={`${fmtXRP(preview.total_at_maturity)} XRP`}
+                      sub={rate ? xrpToUsdLabel(preview.total_at_maturity, rate, 0) : null}
+                      testid="preview-total"
+                    />
+                    {selected.duration_days ? (
+                      <p className="text-[11px] text-slate-400 pt-1 leading-snug">Adding profit extends your maturity a little — the new date is weighted by how much you add.</p>
+                    ) : null}
+                  </>
+                ) : (
+                  <p className="text-xs text-slate-400">New stake balance ≈ {fmtXRP((selected?.principal || 0) + (profit || 0))} XRP.</p>
+                )}
+              </div>
             )}
           </div>
           <button onClick={confirm} disabled={busy || !selected || profit <= 0} data-testid="confirm-reinvest-button"
@@ -82,6 +119,18 @@ function ReinvestDialog({ open, onClose, profit, stakes = [], onDone }) {
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function PreviewRow({ label, value, sub, testid, strong, accent }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-xs text-slate-500">{label}</span>
+      <span className="text-right">
+        <span className={`font-mono tabular-nums ${strong ? "text-sm font-semibold text-slate-900" : "text-sm text-slate-700"}`} style={accent ? { color: accent } : undefined} data-testid={testid}>{value}</span>
+        {sub ? <span className="block text-[10px] text-slate-400 font-normal">{sub}</span> : null}
+      </span>
+    </div>
   );
 }
 

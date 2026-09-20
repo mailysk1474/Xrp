@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { usePrice } from "@/context/PriceContext";
 import { api, apiError } from "@/lib/api";
 import { fmtXRP, xrpToUsdLabel } from "@/lib/format";
-import { Loader2, ArrowUpFromLine, AlertTriangle } from "lucide-react";
+import { Loader2, ArrowUpFromLine, AlertTriangle, BookmarkPlus, Star, X } from "lucide-react";
 
 export default function Withdraw() {
   const { serverState, refresh } = useAuth();
@@ -14,6 +14,8 @@ export default function Withdraw() {
   const [address, setAddress] = useState("");
   const [tag, setTag] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [saved, setSaved] = useState([]);
+  const [savingAddr, setSavingAddr] = useState(false);
   const balance = serverState?.balance ?? 0;
   const disabled = serverState?.user?.withdrawals_disabled;
   const locked = serverState?.user?.locked;
@@ -21,6 +23,44 @@ export default function Withdraw() {
 
   const XRP_RE = /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/;
   const addrValid = XRP_RE.test(address.trim());
+
+  const loadAddrs = useCallback(() => {
+    api.get("/withdraw-addresses").then(({ data }) => setSaved(data.addresses || [])).catch(() => {});
+  }, []);
+  useEffect(() => { loadAddrs(); }, [loadAddrs]);
+
+  const alreadySaved = saved.some((a) => a.address === address.trim() && (a.tag || "") === (tag.trim() || ""));
+
+  const pickAddress = (a) => {
+    setAddress(a.address);
+    setTag(a.tag || "");
+  };
+
+  const saveCurrent = async () => {
+    if (!addrValid) return toast.error("Enter a valid XRP address first.");
+    if (tag.trim() && !/^\d+$/.test(tag.trim())) return toast.error("Destination tag must be a number.");
+    const label = (window.prompt("Name this address (e.g. My Ledger, Kraken):") || "").trim();
+    if (!label) return;
+    setSavingAddr(true);
+    try {
+      await api.post("/withdraw-addresses", { label, address: address.trim(), tag: tag.trim() || undefined });
+      toast.success("Address saved.");
+      loadAddrs();
+    } catch (err) {
+      toast.error(apiError(err));
+    } finally {
+      setSavingAddr(false);
+    }
+  };
+
+  const removeAddr = async (id) => {
+    try {
+      await api.delete(`/withdraw-addresses/${id}`);
+      loadAddrs();
+    } catch (err) {
+      toast.error(apiError(err));
+    }
+  };
 
   const submit = async () => {
     const amt = parseFloat(amount);
@@ -62,6 +102,29 @@ export default function Withdraw() {
           <span className="text-sm text-slate-500">Available balance</span>
           <span className="font-mono font-semibold text-slate-900" data-testid="withdraw-available">{fmtXRP(balance)} XRP{rate ? <span className="block text-right text-xs text-slate-400 font-normal">{xrpToUsdLabel(balance, rate, 2)}</span> : null}</span>
         </div>
+
+        {saved.length > 0 && (
+          <div data-testid="withdraw-saved-addresses">
+            <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf] flex items-center gap-1.5"><Star size={12} /> Saved addresses</label>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {saved.map((a) => {
+                const active = a.address === address.trim() && (a.tag || "") === (tag.trim() || "");
+                return (
+                  <div key={a.id} data-testid={`saved-address-${a.id}`}
+                    className={`group flex items-center gap-1.5 rounded-xl border pl-3 pr-1.5 py-1.5 text-sm transition-all ${active ? "bg-blue-600 text-white border-blue-600" : "bg-white text-slate-600 border-slate-200 hover:border-blue-300"}`}>
+                    <button type="button" onClick={() => pickAddress(a)} disabled={blocked} className="flex flex-col items-start text-left leading-tight disabled:opacity-50" title={`${a.address}${a.tag ? ` · tag ${a.tag}` : ""}`}>
+                      <span className="font-semibold">{a.label}</span>
+                      <span className={`font-mono text-[10px] ${active ? "text-blue-100" : "text-slate-400"}`}>{a.address.slice(0, 6)}…{a.address.slice(-4)}{a.tag ? ` · ${a.tag}` : ""}</span>
+                    </button>
+                    <button type="button" onClick={() => removeAddr(a.id)} data-testid={`delete-address-${a.id}`} className={`p-1 rounded-md ${active ? "hover:bg-white/20 text-blue-100" : "hover:bg-slate-100 text-slate-400"}`} title="Remove">
+                      <X size={13} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
         <div>
           <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf]">Destination XRP address</label>
           <input
@@ -88,6 +151,14 @@ export default function Withdraw() {
             placeholder="e.g. 12345678"
             className="w-full mt-1.5 bg-slate-50 border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 rounded-xl px-4 py-3 text-slate-900 outline-none font-mono text-sm disabled:opacity-50 transition-all"
           />
+          {addrValid && !alreadySaved && (
+            <button type="button" onClick={saveCurrent} disabled={savingAddr || blocked} data-testid="save-address-button" className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-[#0030cf] hover:text-blue-500 disabled:opacity-50 transition-colors">
+              {savingAddr ? <Loader2 className="animate-spin" size={13} /> : <BookmarkPlus size={13} />} Save this address for next time
+            </button>
+          )}
+          {addrValid && alreadySaved && (
+            <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-emerald-600 font-medium"><Star size={13} /> Saved</p>
+          )}
         </div>
         <div>
           <label className="text-xs font-semibold uppercase tracking-wider text-[#0030cf]">Amount (XRP)</label>

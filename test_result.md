@@ -115,6 +115,48 @@ user_problem_statement: |
   4. Auto-restake compounds profit into the preferred (or largest) active stake when profit >= threshold.
 
 backend:
+  - task: "Withdrawal address book (save/reuse payout addresses)"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "NEW endpoints (auth user): GET /api/withdraw-addresses -> {addresses:[{id,label,address,tag,created_at}]}; POST /api/withdraw-addresses {label,address,tag?} validates label non-empty, address XRP regex, tag numeric-if-present, blocks exact duplicate (same address+tag) -> {ok,address}; DELETE /api/withdraw-addresses/{id} -> {ok}. Stored on user doc field saved_addresses (uuid ids). Test: (1) POST valid {label:'Ledger', address:'rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4', tag:'99'} -> 200; GET lists it. (2) POST invalid address 'hello' -> 400; POST blank label -> 400; POST non-numeric tag 'ab' -> 400; POST exact duplicate -> 400. (3) DELETE the id -> 200; GET no longer lists it. (4) No auth -> 401/403."
+        -working: true
+        -agent: "testing"
+        -comment: "✅ VERIFIED: All 10 test cases PASSED. (1) Registered fresh user withdrawaddr_e033fb48@example.com (id=6aafe4aa0516c053f3a8ccdb). (2) POST /api/withdraw-addresses with {label:'Ledger', address:'rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4', tag:'99'} returned 200 with ok=true and address object containing id=ed4d1b84-03c1-482a-bab3-49f20868dbbc, label='Ledger', address='rNzKiTdB6yreGaZ2AzrgykhFaV2jStLvf4', tag='99', and created_at timestamp. (3) GET /api/withdraw-addresses returned 200 with addresses array containing the saved address (verified by id). (4) POST with invalid address 'hello' correctly returned 400 'Enter a valid XRP address (starts with 'r').' (5) POST with blank label correctly returned 400 'Give this address a name.' (6) POST with non-numeric tag 'abc' correctly returned 400 'Destination tag must be a number.' (7) POST exact duplicate (same address+tag) correctly returned 400 'That address is already saved.' (8) DELETE /api/withdraw-addresses/{id} returned 200 with ok=true. (9) GET /api/withdraw-addresses after deletion confirmed address no longer in list. (10) GET /api/withdraw-addresses without Authorization header correctly returned 401. All validation, CRUD operations, and authentication guards working correctly. Withdrawal address book feature is production-ready."
+  - task: "Restake preview (POST /api/reinvest/preview)"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "NEW POST /api/reinvest/preview {stake_id} (auth user) returns projected result WITHOUT mutating: {stake_id, vault_name, duration_days, amount(profit to compound), current_principal, new_principal, current_matures_at, new_matures_at, profit_at_maturity, total_at_maturity}. Uses same restake_projection() as the real compound_restake. Test: fund user, stake 50000 into vip_silver, admin adjust-profit +500, POST /reinvest/preview {stake_id} -> 200 with new_principal≈50500, new_matures_at valid future ISO (<= ~30d), profit_at_maturity>=0 and ≈ new_principal*0.2999 minus small claimed, total_at_maturity = new_principal+profit_at_maturity. Confirm it did NOT change the stake (GET /state principal still 50000, not restaked). Invalid stake_id -> 404; someone else's/exited stake -> 400."
+        -working: true
+        -agent: "testing"
+        -comment: "✅ VERIFIED: All 3 test cases PASSED including CRUCIAL non-mutation verification. (1) Registered fresh user restakepreview_4bbee878@example.com (id=6aafe4ae0516c053f3a8ccdc), admin credited 120000 XRP balance, staked 50000 XRP into vip_silver (stake_id=6aafe4b00516c053f3a8ccdf, initial principal=50000.0), admin added 500 XRP profit. (2) POST /api/reinvest/preview {stake_id} returned 200 with all required fields: stake_id='6aafe4b00516c053f3a8ccdf', vault_name='VIP Silver', duration_days=30, amount=500.011621 (≈500 profit), current_principal=50000.0, new_principal=50500.011621 (≈50500 as expected), current_matures_at='2026-10-20T13:50:40.215091+00:00', new_matures_at='2026-10-20T13:50:40.234980+00:00' (valid future ISO date ~30 days out), profit_at_maturity=15144.941864 (≈new_principal*0.2999=15144.95, within tolerance), total_at_maturity=65644.953485 (=new_principal+profit_at_maturity, verified). (3) CRUCIAL NON-MUTATION TEST: GET /api/state after preview confirmed stake principal is STILL 50000.0 (NOT 50500), proving preview did NOT mutate the stake. (4) POST /api/reinvest/preview with invalid stake_id 'bad123' correctly returned 404 'Stake not found.' All calculations correct, preview is read-only (non-mutating), and error handling working as specified. Restake preview feature is production-ready."
+  - task: "Admin activity feed (GET /api/admin/activity)"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "NEW GET /api/admin/activity (admin-only) returns {activity:[...]} newest-first merging deposits+withdrawals (kind deposit|withdrawal, with amount,status,username,detail), admin audit actions (kind admin_action, action, admin_username, username=target, amount), and signups (kind signup, username). Test: admin -> 200 with activity array; after creating a deposit and an admin balance-adjust, those appear. No auth -> 401/403; non-admin -> 403."
+        -working: true
+        -agent: "testing"
+        -comment: "✅ VERIFIED: All 4 test cases PASSED. (1) Admin logged in successfully with admin@xamanprotocol.com / admin12345. Registered fresh user activitytest_849f12d0@example.com to create signup activity, admin credited 10000 XRP balance to create admin_action activity. (2) GET /api/admin/activity with admin token returned 200 with activity array containing 80 items (newest-first). Activity items structure validated: all items have 'kind' field with valid values (deposit/withdrawal/admin_action/signup) and 'created_at' timestamp. Found 32 admin_action items (including balance adjustments from earlier tests) and 23 signup items (including newly registered user). Verified at least one admin_action and signup item present as expected from test setup. (3) GET /api/admin/activity without Authorization header correctly returned 401. (4) GET /api/admin/activity with non-admin user token correctly returned 403 'Admin access required'. All authentication guards, activity merging (deposits/withdrawals/admin actions/signups), and sorting (newest-first) working correctly. Admin activity feed feature is production-ready."
   - task: "Admin delete user account (with instant session kick)"
     implemented: true
     working: true
@@ -510,3 +552,7 @@ agent_communication:
     -message: "TWO NEW FEATURES to test in the frontend (admin creds admin@xamanprotocol.com / admin12345; user fetest@example.com / Test12345 which has an active VIP Silver stake). (1) ADMIN PROFIT LOG: log in as admin -> lands on /admin. Click the new 'Profit Log' tab (data-testid=admin-tab-profit). It calls GET /api/admin/profit-log and should list at least one row (data-testid starts with profit-log-row-) showing user 'Front Tester / fetest@example.com', 'by admin', amount +500 XRP, and a 'Total manual profit applied' summary row. (2) MATURITY PAYOUT NOTE: log in as fetest@example.com -> dashboard. Each active locked stake's unlock box now shows, under the countdown, a 'Profit at maturity +X XRP' line (data-testid=maturity-profit-{id}) and a 'Total paid out ≈ Y XRP' line (data-testid=maturity-total-{id}). For the VIP Silver stake, profit_at_maturity should equal principal*0.2999 (~15,145 XRP) and total ≈ principal+profit (~65,649 XRP). Verify both render with real numbers."
     -agent: "testing"
     -message: "✅ WEIGHTED RESTAKE BACKEND TESTING COMPLETE - ALL 5 TEST CASES PASSED. Tested the CHANGED restake behavior with weighted maturity extension. TEST A (REGRESSION): Brand-new stake (50000 XRP in vip_silver) verified with claimed_profit=0, profit_at_maturity=14995 (principal*0.2999), total_at_maturity=64995 (principal+profit), matures_at=start+30 days, accrued≈0. TEST B (WEIGHTED RESTAKE): Admin added 500 XRP bonus profit, POST /api/reinvest {stake_id} successfully compounded into existing stake. Post-reinvest: principal increased to 50500.013186 (+500), accrued≈0 (0.008846), claimed_profit=0.013186 (set to offset blended clock), profit_at_maturity=15144.940768 (principal*0.2999-claimed, >=0), total_at_maturity=65644.953954 (principal+profit_at_maturity), matures_at is 30.00 days from now (NOT reset to absurd value, weighted extension working). TEST C (ERROR): User with zero/negative profit (-0.989964 XRP after admin adjustment) correctly receives 400 'You have no profit to restake yet.' when attempting POST /api/reinvest. All numeric assertions passed with observed values matching expected calculations. serialize_stake correctly reports profit_at_maturity and total_at_maturity fields. Weighted restake implementation is correct and production-ready. Test users: weightedrestake_b24fffdd@example.com (id=6aafdf6019d4e8871367f0a8), zeroprofit_65600517@example.com (id=6aafdf6619d4e8871367f0b0)."
+
+
+    -agent: "testing"
+    -message: "✅ THREE NEW BACKEND FEATURES VERIFIED SUCCESSFULLY - ALL TESTS PASSED. Comprehensive testing completed for withdrawal address book, restake preview, and admin activity feed. FEATURE 1 - Withdrawal address book (10 test cases): POST /api/withdraw-addresses with valid label/address/tag returned 200 with correct response structure (id, label, address, tag, created_at). GET /api/withdraw-addresses returned list including saved address. Validation working: invalid address 'hello' -> 400, blank label -> 400, non-numeric tag 'abc' -> 400, duplicate address+tag -> 400. DELETE /api/withdraw-addresses/{id} returned 200, GET confirmed deletion. No auth -> 401. Test user: withdrawaddr_e033fb48@example.com. FEATURE 2 - Restake preview (3 test cases): POST /api/reinvest/preview with valid stake_id returned 200 with all required fields (new_principal=50500.011621, amount=500.011621, profit_at_maturity=15144.941864, total_at_maturity=65644.953485, new_matures_at valid ISO date). CRUCIAL: Preview did NOT mutate - GET /api/state after preview confirmed principal still 50000.0 (not 50500), proving read-only behavior. Invalid stake_id 'bad123' -> 404. Test user: restakepreview_4bbee878@example.com. FEATURE 3 - Admin activity feed (4 test cases): GET /api/admin/activity with admin token returned 200 with 80 activity items. All items have valid 'kind' (deposit/withdrawal/admin_action/signup) and 'created_at'. Found 32 admin_action items and 23 signup items. No auth -> 401, non-admin user -> 403. Test user: activitytest_849f12d0@example.com. All three features are production-ready with correct validation, authentication guards, and business logic."

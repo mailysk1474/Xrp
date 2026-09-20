@@ -9,6 +9,7 @@ import re
 import jwt
 import bcrypt
 import time
+import uuid
 import secrets
 import asyncio
 import logging
@@ -463,14 +464,44 @@ async def gather_profit(user: dict, now: datetime):
     return round(total, 6), to_claim
 
 
+def restake_projection(p0: float, added: float, rate: float, dur: int, old_start_iso: str, now: datetime) -> dict:
+    """Pure math for a weighted restake — used by both the live preview and the real compound.
+
+    Extends the maturity by a WEIGHTED amount: new_start = amount-weighted average of the
+    old start and now. `claimed` offsets the blended clock so net profit continues from 0
+    and the stake pays the fair remaining amount at maturity. No DB writes.
+    """
+    new_principal = round(p0 + added, 6)
+    if dur > 0 and new_principal > 0:
+        old_start_e = parse_iso(old_start_iso).timestamp()
+        now_e = now.timestamp()
+        new_start_e = (p0 * old_start_e + added * now_e) / new_principal
+        new_start_dt = datetime.fromtimestamp(new_start_e, tz=timezone.utc)
+        period = dur * 86400
+        frac = max(0.0, min(1.0, (now_e - new_start_e) / period))
+        claimed = round(new_principal * rate * frac, 6)
+        matures_at = (new_start_dt + timedelta(days=dur)).isoformat()
+    else:
+        new_start_dt = now
+        claimed = 0.0
+        matures_at = None
+    profit_at_maturity = round(max(new_principal * rate - claimed, 0.0), 6)
+    total_at_maturity = round(new_principal + profit_at_maturity, 6)
+    return {
+        "new_principal": new_principal,
+        "new_start": new_start_dt.isoformat(),
+        "claimed": claimed,
+        "matures_at": matures_at,
+        "profit_at_maturity": profit_at_maturity,
+        "total_at_maturity": total_at_maturity,
+    }
+
+
 async def compound_restake(user: dict, target_stake: dict, total: float, to_claim: list,
                            now: datetime, auto: bool = False):
     """Option A — fold all available profit into an EXISTING stake's principal.
 
-    The added capital extends the maturity date by a WEIGHTED amount: the stake's clock
-    becomes the amount-weighted average of its old start and `now`. So restaking a small
-    profit only pushes the end date out a little, while a large top-up moves it more.
-    Each XRP effectively earns its full total-return over a full term from when it entered.
+    The added capital extends the maturity date by a WEIGHTED amount (see restake_projection).
     Returns (amount_compounded, new_principal).
     """
     # Realize every source stake's earned-so-far profit so it isn't double-counted.
@@ -481,36 +512,21 @@ async def compound_restake(user: dict, target_stake: dict, total: float, to_clai
     fresh_target = await db.stakes.find_one({"_id": target_stake["_id"]})
     p0 = float(fresh_target.get("principal", 0.0) or 0.0)
     added = float(total)
-    new_principal = round(p0 + added, 6)
     rate = fresh_target.get("apy", 0) or 0
     dur = fresh_target.get("duration_days", 0) or 0
 
-    set_fields = {"principal": new_principal}
-    if dur > 0 and new_principal > 0:
-        # Weighted "extra days": new_start = (p0*old_start + added*now) / (p0 + added).
-        old_start_e = parse_iso(fresh_target["start_at"]).timestamp()
-        now_e = now.timestamp()
-        new_start_e = (p0 * old_start_e + added * now_e) / new_principal
-        new_start_dt = datetime.fromtimestamp(new_start_e, tz=timezone.utc)
-        period = dur * 86400
-        frac = (now_e - new_start_e) / period
-        frac = max(0.0, min(1.0, frac))
-        # Offset the profit the blended clock would otherwise show as already-accrued,
-        # so net profit continues from 0 on the larger balance and pays the fair
-        # remaining amount (old principal's leftover + full term on the new capital) at maturity.
-        set_fields["start_at"] = new_start_dt.isoformat()
-        set_fields["claimed_profit"] = round(new_principal * rate * frac, 6)
-    else:
-        # Flex (no fixed term): just continue from now on the larger balance.
-        set_fields["start_at"] = now_iso()
-        set_fields["claimed_profit"] = 0.0
-
+    proj = restake_projection(p0, added, rate, dur, fresh_target["start_at"], now)
+    set_fields = {
+        "principal": proj["new_principal"],
+        "start_at": proj["new_start"],
+        "claimed_profit": proj["claimed"],
+    }
     await db.stakes.update_one({"_id": target_stake["_id"]}, {"$set": set_fields})
     await add_transaction(user["_id"], "reinvest", round(total, 6), "completed",
                           {"vault": target_stake.get("vault_name"),
                            "stake_id": str(target_stake["_id"]),
-                           "new_principal": new_principal, "auto": auto})
-    return round(total, 6), new_principal
+                           "new_principal": proj["new_principal"], "auto": auto})
+    return round(total, 6), proj["new_principal"]
 
 
 async def settle_matured_stake(stake: dict, now: datetime) -> float:
@@ -623,6 +639,12 @@ class AmountReq(BaseModel):
 
 class WithdrawReq(BaseModel):
     amount: float
+    address: str
+    tag: Optional[str] = None
+
+
+class SaveAddressReq(BaseModel):
+    label: str
     address: str
     tag: Optional[str] = None
 
@@ -983,6 +1005,37 @@ async def reinvest(body: ReinvestReq, user: dict = Depends(require_active_user))
     return {"ok": True, "amount": amount, "principal": new_principal}
 
 
+@api.post("/reinvest/preview")
+async def reinvest_preview(body: ReinvestReq, user: dict = Depends(require_active_user)):
+    """Show the exact new maturity date + payout BEFORE the member confirms a restake."""
+    try:
+        oid = ObjectId(body.stake_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Stake not found.")
+    target = await db.stakes.find_one({"_id": oid, "user_id": str(user["_id"])})
+    if not target or target.get("principal", 0) <= 0 or target.get("status") in ("exited", "completed"):
+        raise HTTPException(status_code=400, detail="Choose an active stake to compound your profit into.")
+    now = datetime.now(timezone.utc)
+    fresh = await db.users.find_one({"_id": user["_id"]})
+    total, _ = await gather_profit(fresh, now)
+    p0 = float(target.get("principal", 0.0) or 0.0)
+    rate = target.get("apy", 0) or 0
+    dur = target.get("duration_days", 0) or 0
+    proj = restake_projection(p0, float(total), rate, dur, target["start_at"], now)
+    return {
+        "stake_id": body.stake_id,
+        "vault_name": target.get("vault_name"),
+        "duration_days": dur,
+        "amount": round(total, 6),
+        "current_principal": round(p0, 6),
+        "new_principal": proj["new_principal"],
+        "current_matures_at": (parse_iso(target["start_at"]) + timedelta(days=dur)).isoformat() if dur else None,
+        "new_matures_at": proj["matures_at"],
+        "profit_at_maturity": proj["profit_at_maturity"],
+        "total_at_maturity": proj["total_at_maturity"],
+    }
+
+
 @api.post("/auto-restake")
 async def set_auto_restake(body: AutoRestakeReq, user: dict = Depends(require_active_user)):
     if not body.enabled:
@@ -1115,6 +1168,42 @@ async def withdraw(body: WithdrawReq, user: dict = Depends(require_active_user))
 
 
 # ---------------------------------------------------------------------------
+# Withdrawal address book
+# ---------------------------------------------------------------------------
+@api.get("/withdraw-addresses")
+async def list_withdraw_addresses(user: dict = Depends(get_current_user)):
+    fresh = await db.users.find_one({"_id": user["_id"]})
+    return {"addresses": fresh.get("saved_addresses", [])}
+
+
+@api.post("/withdraw-addresses")
+async def add_withdraw_address(body: SaveAddressReq, user: dict = Depends(get_current_user)):
+    label = (body.label or "").strip()
+    address = (body.address or "").strip()
+    tag = (body.tag or "").strip()
+    if not label:
+        raise HTTPException(status_code=400, detail="Give this address a name.")
+    if not XRP_ADDRESS_RE.match(address):
+        raise HTTPException(status_code=400, detail="Enter a valid XRP address (starts with 'r').")
+    if tag and not tag.isdigit():
+        raise HTTPException(status_code=400, detail="Destination tag must be a number.")
+    fresh = await db.users.find_one({"_id": user["_id"]})
+    existing = fresh.get("saved_addresses", [])
+    if any(a.get("address") == address and (a.get("tag") or "") == tag for a in existing):
+        raise HTTPException(status_code=400, detail="That address is already saved.")
+    entry = {"id": str(uuid.uuid4()), "label": label, "address": address,
+             "tag": tag or None, "created_at": now_iso()}
+    await db.users.update_one({"_id": user["_id"]}, {"$push": {"saved_addresses": entry}})
+    return {"ok": True, "address": entry}
+
+
+@api.delete("/withdraw-addresses/{addr_id}")
+async def delete_withdraw_address(addr_id: str, user: dict = Depends(get_current_user)):
+    await db.users.update_one({"_id": user["_id"]}, {"$pull": {"saved_addresses": {"id": addr_id}}})
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
 # Admin endpoints
 # ---------------------------------------------------------------------------
 @api.get("/admin/stats")
@@ -1156,6 +1245,64 @@ async def admin_update_settings(body: SettingsReq, admin: dict = Depends(require
     await manager.notify_all({"type": "state_updated"})
     await manager.notify_admins()
     return {"ok": True, "hot_wallet_address": addr}
+
+
+@api.get("/admin/activity")
+async def admin_activity(admin: dict = Depends(require_admin)):
+    """Unified, most-recent-first feed: deposits, withdrawals, admin account changes, signups."""
+    items = []
+    user_cache = {}
+
+    async def uname(uid):
+        if not uid:
+            return None
+        if uid in user_cache:
+            return user_cache[uid]
+        try:
+            u = await db.users.find_one({"_id": ObjectId(uid)})
+        except Exception:
+            u = None
+        name = (u.get("username") if u else None) or "unknown"
+        user_cache[uid] = name
+        return name
+
+    txns = await db.transactions.find({"type": {"$in": ["deposit", "withdrawal"]}}).sort("created_at", -1).to_list(80)
+    for t in txns:
+        items.append({
+            "id": str(t["_id"]),
+            "kind": t["type"],
+            "username": await uname(t.get("user_id")),
+            "amount": t.get("amount"),
+            "status": t.get("status"),
+            "created_at": t.get("created_at"),
+            "detail": t.get("meta", {}),
+        })
+
+    logs = await db.audit_log.find({}).sort("created_at", -1).to_list(80)
+    for l in logs:
+        items.append({
+            "id": str(l["_id"]),
+            "kind": "admin_action",
+            "action": l.get("action"),
+            "admin_username": l.get("admin_username"),
+            "username": await uname(l.get("target_user")),
+            "amount": (l.get("detail") or {}).get("amount"),
+            "created_at": l.get("created_at"),
+            "detail": l.get("detail", {}),
+        })
+
+    users = await db.users.find({}).sort("created_at", -1).to_list(40)
+    for u in users:
+        if u.get("created_at"):
+            items.append({
+                "id": f"signup-{str(u['_id'])}",
+                "kind": "signup",
+                "username": u.get("username"),
+                "created_at": u.get("created_at"),
+            })
+
+    items.sort(key=lambda x: x.get("created_at") or "", reverse=True)
+    return {"activity": items[:80]}
 
 
 @api.get("/admin/users")

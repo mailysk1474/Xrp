@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Users, ArrowDownToLine, ArrowUpFromLine, ScrollText, Lock, Search,
-  Loader2, Check, X, Crown, Plus, Minus, Sliders, LayoutDashboard, Layers, Mail, Copy, Wallet, Clock, TrendingUp, Trash2, AlertTriangle,
+  Loader2, Check, X, Crown, Plus, Minus, Sliders, LayoutDashboard, Layers, Mail, Copy, Wallet, Clock, TrendingUp, Trash2, AlertTriangle, Activity, UserPlus,
 } from "lucide-react";
 
 const TIERS = ["auto", "starter", "silver", "gold", "platinum", "diamond"];
@@ -43,6 +43,7 @@ export default function Admin() {
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="bg-white border border-slate-200 p-1 rounded-xl flex-wrap h-auto">
             <TabsTrigger value="users" data-testid="admin-tab-users" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg text-slate-600"><Users size={15} className="mr-1.5" /> Users</TabsTrigger>
+            <TabsTrigger value="activity" data-testid="admin-tab-activity" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg text-slate-600"><Activity size={15} className="mr-1.5" /> Activity</TabsTrigger>
             <TabsTrigger value="deposits" data-testid="admin-tab-deposits" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg text-slate-600"><ArrowDownToLine size={15} className="mr-1.5" /> Deposits</TabsTrigger>
             <TabsTrigger value="withdrawals" data-testid="admin-tab-withdrawals" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg text-slate-600"><ArrowUpFromLine size={15} className="mr-1.5" /> Withdrawals</TabsTrigger>
             <TabsTrigger value="vaults" data-testid="admin-tab-vaults" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg text-slate-600"><Layers size={15} className="mr-1.5" /> Vaults</TabsTrigger>
@@ -51,6 +52,7 @@ export default function Admin() {
             <TabsTrigger value="settings" data-testid="admin-tab-settings" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg text-slate-600"><Wallet size={15} className="mr-1.5" /> Settings</TabsTrigger>
           </TabsList>
           <TabsContent value="users" className="mt-5"><UsersTab /></TabsContent>
+          <TabsContent value="activity" className="mt-5"><ActivityTab /></TabsContent>
           <TabsContent value="deposits" className="mt-5"><DepositsTab /></TabsContent>
           <TabsContent value="withdrawals" className="mt-5"><WithdrawalsTab /></TabsContent>
           <TabsContent value="vaults" className="mt-5"><VaultsTab /></TabsContent>
@@ -634,6 +636,73 @@ function SettingsTab() {
           <span>Once saved, every connected member sees the new deposit address immediately — no re-login or refresh needed.</span>
         </div>
       </div>
+    </div>
+  );
+}
+
+
+const ACTION_LABELS = {
+  adjust_balance: "adjusted balance",
+  adjust_profit: "added profit bonus",
+  set_tier: "changed VIP tier",
+  lock: "locked account",
+  unlock: "unlocked account",
+  disable_withdrawals: "disabled withdrawals",
+  enable_withdrawals: "enabled withdrawals",
+  delete_user: "deleted account",
+  update_hot_wallet: "updated hot wallet",
+  approve_withdrawal: "approved withdrawal",
+  reject_withdrawal: "rejected withdrawal",
+  confirm_deposit: "confirmed deposit",
+  reject_deposit: "rejected deposit",
+};
+
+function ActivityIcon({ kind }) {
+  const base = "w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border";
+  if (kind === "deposit") return <div className={`${base} bg-emerald-50 text-emerald-600 border-emerald-100`}><ArrowDownToLine size={16} /></div>;
+  if (kind === "withdrawal") return <div className={`${base} bg-amber-50 text-amber-600 border-amber-100`}><ArrowUpFromLine size={16} /></div>;
+  if (kind === "signup") return <div className={`${base} bg-violet-50 text-violet-600 border-violet-100`}><UserPlus size={16} /></div>;
+  return <div className={`${base} bg-blue-50 text-[#0030cf] border-blue-100`}><Sliders size={16} /></div>;
+}
+
+function ActivityTab() {
+  const [items, setItems] = useState(null);
+  const load = useCallback(() => {
+    api.get("/admin/activity").then(({ data }) => setItems(data.activity || [])).catch(() => setItems([]));
+  }, []);
+  useRefreshOn(load);
+
+  if (items === null) return <div className="flex justify-center py-16"><Loader2 className="animate-spin text-[#0030cf]" /></div>;
+  if (items.length === 0) return <p className="text-center text-slate-400 py-12" data-testid="admin-activity-empty">No activity yet.</p>;
+
+  const statusColor = (s) => s === "pending" ? "text-amber-600" : s === "rejected" ? "text-red-500" : "text-emerald-600";
+
+  return (
+    <div className="space-y-2" data-testid="admin-activity-feed">
+      <p className="text-sm text-slate-500 mb-1">Live feed of deposits, withdrawals, account changes and sign-ups. Updates automatically.</p>
+      {items.map((it) => {
+        let title, sub;
+        if (it.kind === "deposit" || it.kind === "withdrawal") {
+          title = <><span className="capitalize">{it.kind}</span> <span className="text-slate-400">·</span> <span className="font-mono">{fmtXRP(it.amount)} XRP</span> <span className={`text-xs ${statusColor(it.status)}`}>{it.status}</span></>;
+          sub = <>@{it.username}{it.kind === "withdrawal" && it.detail?.destination_address ? <span className="font-mono"> → {it.detail.destination_address.slice(0, 8)}…{it.detail.destination_address.slice(-4)}{it.detail?.destination_tag ? ` · tag ${it.detail.destination_tag}` : ""}</span> : null}</>;
+        } else if (it.kind === "signup") {
+          title = <>New sign-up</>;
+          sub = <>@{it.username}</>;
+        } else {
+          title = <><b className="text-slate-900">{it.admin_username}</b> {ACTION_LABELS[it.action] || it.action}{it.amount != null ? <span className="font-mono"> ({it.amount})</span> : null}</>;
+          sub = it.username ? <>on @{it.username}</> : null;
+        }
+        return (
+          <div key={it.id} className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl p-3 shadow-sm" data-testid={`activity-item-${it.kind}`}>
+            <ActivityIcon kind={it.kind} />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-slate-700 truncate">{title}</p>
+              {sub ? <p className="text-xs text-slate-400 truncate">{sub}</p> : null}
+            </div>
+            <span className="text-[11px] text-slate-400 shrink-0">{fmtDate(it.created_at)}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }
