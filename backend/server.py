@@ -1158,6 +1158,32 @@ async def admin_withdrawals_toggle(user_id: str, body: BoolReq, admin: dict = De
     return {"ok": True}
 
 
+@api.delete("/admin/users/{user_id}")
+async def admin_delete_user(user_id: str, admin: dict = Depends(require_admin)):
+    """Permanently delete a user and all of their stakes, transactions and audit entries."""
+    try:
+        oid = ObjectId(user_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="User not found.")
+    u = await db.users.find_one({"_id": oid})
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found.")
+    if u.get("role") == "admin":
+        raise HTTPException(status_code=400, detail="Admin accounts cannot be deleted.")
+    if str(u["_id"]) == str(admin["_id"]):
+        raise HTTPException(status_code=400, detail="You cannot delete your own account.")
+    st = await db.stakes.delete_many({"user_id": user_id})
+    tx = await db.transactions.delete_many({"user_id": user_id})
+    await db.audit_log.delete_many({"target_user": user_id})
+    await db.users.delete_one({"_id": oid})
+    await audit(admin, "delete_user", user_id, {
+        "email": u.get("email"), "username": u.get("username"),
+        "stakes": st.deleted_count, "transactions": tx.deleted_count,
+    })
+    await manager.notify_admins()
+    return {"ok": True, "deleted": {"stakes": st.deleted_count, "transactions": tx.deleted_count}}
+
+
 @api.get("/admin/withdrawals")
 async def admin_withdrawal_queue(admin: dict = Depends(require_admin)):
     txns = await db.transactions.find({"type": "withdrawal", "status": "pending"}).sort("created_at", 1).to_list(500)
