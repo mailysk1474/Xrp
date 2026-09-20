@@ -361,8 +361,8 @@ def serialize_stake(stake: dict, now: datetime, vault: dict = None) -> dict:
         if stake.get("duration_days", 0) else None,
         "status": status,
         "accrued": round(net, 6),
-        "profit_at_maturity": round(principal * stake["apy"], 6),
-        "total_at_maturity": round(principal + principal * stake["apy"], 6),
+        "profit_at_maturity": round(max(principal * stake["apy"] - claimed, 0.0), 6),
+        "total_at_maturity": round(principal + max(principal * stake["apy"] - claimed, 0.0), 6),
         "claimed_profit": round(claimed, 6),
         "tier": stake.get("tier", "flex"),
         "can_exit": can_exit,
@@ -467,22 +467,45 @@ async def compound_restake(user: dict, target_stake: dict, total: float, to_clai
                            now: datetime, auto: bool = False):
     """Option A — fold all available profit into an EXISTING stake's principal.
 
-    The stake's accrual clock resets to `now`, so it continues earning its total-return
-    rate on the new, larger balance ("continues from where it stops, based on the balance").
+    The added capital extends the maturity date by a WEIGHTED amount: the stake's clock
+    becomes the amount-weighted average of its old start and `now`. So restaking a small
+    profit only pushes the end date out a little, while a large top-up moves it more.
+    Each XRP effectively earns its full total-return over a full term from when it entered.
     Returns (amount_compounded, new_principal).
     """
     # Realize every source stake's earned-so-far profit so it isn't double-counted.
     for sid, acc in to_claim:
         await db.stakes.update_one({"_id": sid}, {"$set": {"claimed_profit": round(acc, 6)}})
     await db.users.update_one({"_id": user["_id"]}, {"$set": {"bonus_profit": 0.0}})
-    # Re-read the target after the claim update, then compound + reset its clock.
+    # Re-read the target after the claim update, then compound + re-time its clock.
     fresh_target = await db.stakes.find_one({"_id": target_stake["_id"]})
-    new_principal = round(float(fresh_target.get("principal", 0.0)) + total, 6)
-    await db.stakes.update_one({"_id": target_stake["_id"]}, {"$set": {
-        "principal": new_principal,
-        "start_at": now_iso(),
-        "claimed_profit": 0.0,
-    }})
+    p0 = float(fresh_target.get("principal", 0.0) or 0.0)
+    added = float(total)
+    new_principal = round(p0 + added, 6)
+    rate = fresh_target.get("apy", 0) or 0
+    dur = fresh_target.get("duration_days", 0) or 0
+
+    set_fields = {"principal": new_principal}
+    if dur > 0 and new_principal > 0:
+        # Weighted "extra days": new_start = (p0*old_start + added*now) / (p0 + added).
+        old_start_e = parse_iso(fresh_target["start_at"]).timestamp()
+        now_e = now.timestamp()
+        new_start_e = (p0 * old_start_e + added * now_e) / new_principal
+        new_start_dt = datetime.fromtimestamp(new_start_e, tz=timezone.utc)
+        period = dur * 86400
+        frac = (now_e - new_start_e) / period
+        frac = max(0.0, min(1.0, frac))
+        # Offset the profit the blended clock would otherwise show as already-accrued,
+        # so net profit continues from 0 on the larger balance and pays the fair
+        # remaining amount (old principal's leftover + full term on the new capital) at maturity.
+        set_fields["start_at"] = new_start_dt.isoformat()
+        set_fields["claimed_profit"] = round(new_principal * rate * frac, 6)
+    else:
+        # Flex (no fixed term): just continue from now on the larger balance.
+        set_fields["start_at"] = now_iso()
+        set_fields["claimed_profit"] = 0.0
+
+    await db.stakes.update_one({"_id": target_stake["_id"]}, {"$set": set_fields})
     await add_transaction(user["_id"], "reinvest", round(total, 6), "completed",
                           {"vault": target_stake.get("vault_name"),
                            "stake_id": str(target_stake["_id"]),

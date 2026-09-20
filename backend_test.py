@@ -1991,6 +1991,405 @@ class TestWithdrawalAddressTag:
             return False
 
 
+
+
+class TestWeightedRestake:
+    """Test weighted restake behavior: compound profit extends maturity proportionally"""
+    def __init__(self):
+        self.admin_token = None
+        self.user_token = None
+        self.user_id = None
+        self.user_email = None
+        self.stake_id = None
+        self.user2_token = None
+        self.user2_id = None
+        self.user2_email = None
+        self.user2_stake_id = None
+        
+    def setup_admin_token(self):
+        """Get admin token"""
+        log("\n=== SETUP: Admin Login ===")
+        resp = requests.post(f"{BASE_URL}/auth/login", json={
+            "email": ADMIN_EMAIL,
+            "password": ADMIN_PASSWORD
+        })
+        assert_eq(resp.status_code, 200, "Admin login")
+        self.admin_token = resp.json()["token"]
+        log(f"✓ Admin token obtained")
+        
+    def case_1_register_and_fund_user(self):
+        """Case 1: Register fresh user and admin credits 120000 XRP"""
+        log("\n=== CASE 1: Register and Fund User ===")
+        
+        # Register user
+        random_suffix = secrets.token_hex(4)
+        self.user_email = f"weightedrestake_{random_suffix}@example.com"
+        
+        resp = requests.post(f"{BASE_URL}/auth/register", json={
+            "first_name": "Weighted",
+            "last_name": "Restake",
+            "email": self.user_email,
+            "password": "secret123"
+        })
+        
+        assert_eq(resp.status_code, 200, "User registration")
+        data = resp.json()
+        self.user_token = data["token"]
+        self.user_id = data["user"]["id"]
+        log(f"✓ User registered: email={self.user_email}, id={self.user_id}")
+        
+        # Admin funds user with 120000 XRP
+        resp = requests.post(
+            f"{BASE_URL}/admin/users/{self.user_id}/adjust-balance",
+            json={"amount": 120000},
+            headers={"Authorization": f"Bearer {self.admin_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "Admin balance credit")
+        log(f"✓ Balance credited: 120000 XRP")
+        
+    def case_2_stake_50000_vip_silver(self):
+        """Case 2: Stake 50000 XRP into vip_silver"""
+        log("\n=== CASE 2: Stake 50000 XRP into vip_silver ===")
+        
+        resp = requests.post(
+            f"{BASE_URL}/stakes",
+            json={"vault_key": "vip_silver", "amount": 50000},
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "Stake creation")
+        log(f"✓ Staked 50000 XRP into vip_silver (30 days, 0.2999 total return)")
+        
+    def case_3_regression_brand_new_stake(self):
+        """Case 3 (TEST A): REGRESSION - brand-new stake (no restake yet)"""
+        log("\n=== CASE 3 (TEST A): REGRESSION - Brand-New Stake ===")
+        
+        resp = requests.get(
+            f"{BASE_URL}/state",
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "GET /api/state")
+        data = resp.json()
+        
+        stakes = data.get("stakes", [])
+        assert_true(len(stakes) > 0, "User has at least one stake")
+        
+        # Find vip_silver stake
+        stake = None
+        for s in stakes:
+            if s.get("vault_key") == "vip_silver" and s.get("status") == "active":
+                stake = s
+                break
+        
+        assert_true(stake is not None, "Found active vip_silver stake")
+        self.stake_id = stake["id"]
+        
+        principal = stake.get("principal", 0)
+        apy = stake.get("apy", 0)
+        claimed_profit = stake.get("claimed_profit", 0)
+        profit_at_maturity = stake.get("profit_at_maturity", 0)
+        total_at_maturity = stake.get("total_at_maturity", 0)
+        accrued = stake.get("accrued", 0)
+        start_at = stake.get("start_at")
+        matures_at = stake.get("matures_at")
+        
+        log(f"Stake values: principal={principal}, apy={apy}, claimed_profit={claimed_profit}")
+        log(f"  profit_at_maturity={profit_at_maturity}, total_at_maturity={total_at_maturity}")
+        log(f"  accrued={accrued}, start_at={start_at}, matures_at={matures_at}")
+        
+        # Assert claimed_profit == 0 (or ~0)
+        assert_true(abs(claimed_profit) < 0.01, f"claimed_profit ({claimed_profit}) ≈ 0")
+        log(f"✓ claimed_profit ≈ 0: {claimed_profit}")
+        
+        # Assert profit_at_maturity ≈ principal * 0.2999 (50000 * 0.2999 = 14995)
+        expected_profit = principal * apy
+        tolerance = 1.0  # Allow 1 XRP tolerance
+        assert_true(abs(profit_at_maturity - expected_profit) < tolerance,
+                   f"profit_at_maturity ({profit_at_maturity}) ≈ principal * apy ({expected_profit})")
+        log(f"✓ profit_at_maturity ≈ {expected_profit}: {profit_at_maturity}")
+        
+        # Assert total_at_maturity ≈ principal + profit_at_maturity
+        expected_total = principal + profit_at_maturity
+        assert_true(abs(total_at_maturity - expected_total) < 0.01,
+                   f"total_at_maturity ({total_at_maturity}) ≈ principal + profit_at_maturity ({expected_total})")
+        log(f"✓ total_at_maturity ≈ {expected_total}: {total_at_maturity}")
+        
+        # Assert matures_at ≈ start_at + 30 days
+        from datetime import datetime, timedelta, timezone
+        start_dt = datetime.fromisoformat(start_at.replace('Z', '+00:00'))
+        matures_dt = datetime.fromisoformat(matures_at.replace('Z', '+00:00'))
+        expected_matures = start_dt + timedelta(days=30)
+        
+        time_diff = abs((matures_dt - expected_matures).total_seconds())
+        assert_true(time_diff < 60, f"matures_at ({matures_at}) ≈ start_at + 30 days (diff={time_diff}s)")
+        log(f"✓ matures_at ≈ start_at + 30 days: {matures_at}")
+        
+        # Assert accrued is ~0 and small right after staking
+        assert_true(accrued < 1.0, f"accrued ({accrued}) is small right after staking")
+        log(f"✓ accrued is small: {accrued}")
+        
+        log(f"✅ TEST A PASSED: Brand-new stake has correct values")
+        
+    def case_4_weighted_restake(self):
+        """Case 4 (TEST B): WEIGHTED RESTAKE - admin adds bonus profit, then reinvest"""
+        log("\n=== CASE 4 (TEST B): WEIGHTED RESTAKE ===")
+        
+        # Admin adds bonus profit: 500 XRP
+        log("Admin adding 500 XRP bonus profit...")
+        resp = requests.post(
+            f"{BASE_URL}/admin/users/{self.user_id}/adjust-profit",
+            json={"amount": 500},
+            headers={"Authorization": f"Bearer {self.admin_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "Admin profit adjustment")
+        log(f"✓ Admin added 500 XRP bonus profit")
+        
+        # Wait a moment for the update to propagate
+        time.sleep(0.5)
+        
+        # POST /api/reinvest with stake_id
+        log(f"Reinvesting into stake {self.stake_id}...")
+        resp = requests.post(
+            f"{BASE_URL}/reinvest",
+            json={"stake_id": self.stake_id},
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "POST /api/reinvest returns 200")
+        reinvest_data = resp.json()
+        
+        assert_eq(reinvest_data["ok"], True, "Reinvest ok is true")
+        compounded_amount = reinvest_data.get("amount", 0)
+        new_principal = reinvest_data.get("principal", 0)
+        
+        log(f"✓ Reinvest successful: compounded={compounded_amount}, new_principal={new_principal}")
+        
+        # Wait a moment for the update to propagate
+        time.sleep(0.5)
+        
+        # GET /api/state and verify
+        log("Verifying post-reinvest state...")
+        resp = requests.get(
+            f"{BASE_URL}/state",
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "GET /api/state")
+        data = resp.json()
+        
+        stakes = data.get("stakes", [])
+        stake = None
+        for s in stakes:
+            if s["id"] == self.stake_id:
+                stake = s
+                break
+        
+        assert_true(stake is not None, "Found stake after reinvest")
+        
+        principal = stake.get("principal", 0)
+        accrued = stake.get("accrued", 0)
+        claimed_profit = stake.get("claimed_profit", 0)
+        profit_at_maturity = stake.get("profit_at_maturity", 0)
+        total_at_maturity = stake.get("total_at_maturity", 0)
+        matures_at = stake.get("matures_at")
+        apy = stake.get("apy", 0)
+        
+        log(f"Post-reinvest values: principal={principal}, accrued={accrued}, claimed_profit={claimed_profit}")
+        log(f"  profit_at_maturity={profit_at_maturity}, total_at_maturity={total_at_maturity}")
+        log(f"  matures_at={matures_at}")
+        
+        # Assert principal increased by ~500 (≈ 50500)
+        expected_principal = 50500
+        tolerance = 10  # Allow 10 XRP tolerance for small accrued profit
+        assert_true(abs(principal - expected_principal) < tolerance,
+                   f"principal ({principal}) ≈ 50500 (increased by ~500)")
+        log(f"✓ principal increased by ~500: {principal}")
+        
+        # Assert accrued (net) is ≈ 0 right after the restake
+        assert_true(accrued < 1.0, f"accrued ({accrued}) ≈ 0 right after restake")
+        log(f"✓ accrued ≈ 0 right after restake: {accrued}")
+        
+        # Assert claimed_profit >= 0 and is set
+        assert_true(claimed_profit >= 0, f"claimed_profit ({claimed_profit}) >= 0")
+        log(f"✓ claimed_profit is set: {claimed_profit}")
+        
+        # Assert profit_at_maturity ≈ principal*0.2999 - claimed_profit and is >= 0
+        expected_profit_at_maturity = principal * apy - claimed_profit
+        tolerance = 10  # Allow 10 XRP tolerance
+        assert_true(abs(profit_at_maturity - expected_profit_at_maturity) < tolerance,
+                   f"profit_at_maturity ({profit_at_maturity}) ≈ principal*apy - claimed ({expected_profit_at_maturity})")
+        assert_true(profit_at_maturity >= 0, f"profit_at_maturity ({profit_at_maturity}) >= 0")
+        log(f"✓ profit_at_maturity ≈ {expected_profit_at_maturity}: {profit_at_maturity}")
+        
+        # Assert total_at_maturity == principal + profit_at_maturity
+        expected_total = principal + profit_at_maturity
+        assert_true(abs(total_at_maturity - expected_total) < 0.01,
+                   f"total_at_maturity ({total_at_maturity}) == principal + profit_at_maturity ({expected_total})")
+        log(f"✓ total_at_maturity == {expected_total}: {total_at_maturity}")
+        
+        # Assert matures_at is a valid future ISO date, no more than ~30 days out from now, and >= now
+        from datetime import datetime, timedelta, timezone
+        now = datetime.now(timezone.utc)
+        matures_dt = datetime.fromisoformat(matures_at.replace('Z', '+00:00'))
+        
+        assert_true(matures_dt >= now, f"matures_at ({matures_at}) >= now")
+        log(f"✓ matures_at is in the future: {matures_at}")
+        
+        days_until_maturity = (matures_dt - now).total_seconds() / 86400
+        assert_true(days_until_maturity <= 31, f"matures_at is no more than ~30 days out (got {days_until_maturity:.2f} days)")
+        log(f"✓ matures_at is no more than ~30 days out: {days_until_maturity:.2f} days")
+        
+        log(f"✅ TEST B PASSED: Weighted restake working correctly")
+        
+    def case_5_error_zero_profit_reinvest(self):
+        """Case 5 (TEST C): ERROR - user with zero profit tries to reinvest -> 400"""
+        log("\n=== CASE 5 (TEST C): ERROR - Zero Profit Reinvest ===")
+        
+        # Register a second user
+        random_suffix = secrets.token_hex(4)
+        self.user2_email = f"zeroprofit_{random_suffix}@example.com"
+        
+        resp = requests.post(f"{BASE_URL}/auth/register", json={
+            "first_name": "Zero",
+            "last_name": "Profit",
+            "email": self.user2_email,
+            "password": "secret123"
+        })
+        
+        assert_eq(resp.status_code, 200, "User2 registration")
+        data = resp.json()
+        self.user2_token = data["token"]
+        self.user2_id = data["user"]["id"]
+        log(f"✓ User2 registered: email={self.user2_email}, id={self.user2_id}")
+        
+        # Admin funds user2 with 60000 XRP
+        resp = requests.post(
+            f"{BASE_URL}/admin/users/{self.user2_id}/adjust-balance",
+            json={"amount": 60000},
+            headers={"Authorization": f"Bearer {self.admin_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "Admin balance credit for user2")
+        log(f"✓ User2 balance credited: 60000 XRP")
+        
+        # User2 stakes into vip_silver
+        resp = requests.post(
+            f"{BASE_URL}/stakes",
+            json={"vault_key": "vip_silver", "amount": 50000},
+            headers={"Authorization": f"Bearer {self.user2_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "User2 stake creation")
+        log(f"✓ User2 staked 50000 XRP into vip_silver")
+        
+        # Get user2's stake_id
+        resp = requests.get(
+            f"{BASE_URL}/state",
+            headers={"Authorization": f"Bearer {self.user2_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "GET /api/state for user2")
+        data = resp.json()
+        
+        stakes = data.get("stakes", [])
+        stake = None
+        for s in stakes:
+            if s.get("vault_key") == "vip_silver" and s.get("status") == "active":
+                stake = s
+                break
+        
+        assert_true(stake is not None, "Found user2's active vip_silver stake")
+        self.user2_stake_id = stake["id"]
+        
+        profit = data.get("profit", 0)
+        log(f"User2 current profit: {profit} XRP")
+        
+        # Reinvest all available profit (even if tiny) to zero it out
+        log(f"First reinvest to compound all available profit...")
+        resp = requests.post(
+            f"{BASE_URL}/reinvest",
+            json={"stake_id": self.user2_stake_id},
+            headers={"Authorization": f"Bearer {self.user2_token}"}
+        )
+        
+        # Should succeed with the tiny profit
+        assert_eq(resp.status_code, 200, "First reinvest succeeds")
+        log(f"✓ First reinvest succeeded, compounded {profit} XRP")
+        
+        # Now immediately try to reinvest again - but profit will have accrued again
+        # To truly test zero profit, we need to use admin to REMOVE bonus profit
+        # Let's set bonus_profit to a negative value to offset any accrued profit
+        
+        # Admin removes any bonus profit (set to -1 to ensure total profit is negative/zero)
+        log("Admin setting bonus_profit to -1 to ensure zero total profit...")
+        resp = requests.post(
+            f"{BASE_URL}/admin/users/{self.user2_id}/adjust-profit",
+            json={"amount": -1},
+            headers={"Authorization": f"Bearer {self.admin_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "Admin profit adjustment")
+        log(f"✓ Admin set bonus_profit to -1")
+        
+        # Wait a tiny bit
+        time.sleep(0.1)
+        
+        # Check current profit
+        resp = requests.get(
+            f"{BASE_URL}/state",
+            headers={"Authorization": f"Bearer {self.user2_token}"}
+        )
+        data = resp.json()
+        current_profit = data.get("profit", 0)
+        log(f"User2 current profit after adjustment: {current_profit} XRP")
+        
+        # Try to reinvest with zero/negative profit -> should return 400
+        log(f"Attempting to reinvest with zero/negative profit...")
+        resp = requests.post(
+            f"{BASE_URL}/reinvest",
+            json={"stake_id": self.user2_stake_id},
+            headers={"Authorization": f"Bearer {self.user2_token}"}
+        )
+        
+        assert_eq(resp.status_code, 400, "Reinvest with zero profit returns 400")
+        detail = resp.json().get("detail", "")
+        log(f"✓ Correctly rejected zero profit reinvest: {resp.status_code} - {detail}")
+        
+        # Verify the error message mentions "no profit"
+        assert_true("no profit" in detail.lower() or "nothing" in detail.lower(),
+                   f"Error message mentions no profit: {detail}")
+        log(f"✓ Error message is appropriate: '{detail}'")
+        
+        log(f"✅ TEST C PASSED: Zero profit reinvest correctly returns 400")
+        
+    def run_all_tests(self):
+        """Run all test cases"""
+        try:
+            self.setup_admin_token()
+            self.case_1_register_and_fund_user()
+            self.case_2_stake_50000_vip_silver()
+            self.case_3_regression_brand_new_stake()
+            self.case_4_weighted_restake()
+            self.case_5_error_zero_profit_reinvest()
+            
+            log("\n" + "="*60)
+            log("✅ ALL 5 WEIGHTED RESTAKE TEST CASES PASSED")
+            log("="*60)
+            return True
+            
+        except AssertionError as e:
+            log(f"\n❌ TEST FAILED: {e}")
+            return False
+        except Exception as e:
+            log(f"\n❌ UNEXPECTED ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+
 if __name__ == "__main__":
     import sys
     
@@ -2017,6 +2416,10 @@ if __name__ == "__main__":
     elif len(sys.argv) > 1 and sys.argv[1] == "adminstats":
         # Run admin stats and last_login tests
         tester = TestAdminStatsAndLastLogin()
+        success = tester.run_all_tests()
+    elif len(sys.argv) > 1 and sys.argv[1] == "weightedrestake":
+        # Run weighted restake tests
+        tester = TestWeightedRestake()
         success = tester.run_all_tests()
     else:
         # Run auth tests by default
