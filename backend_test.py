@@ -10,11 +10,11 @@ import secrets
 from typing import Dict, Any
 
 # Base URL from frontend/.env
-BASE_URL = "https://config-editor-4.preview.emergentagent.com/api"
+BASE_URL = "https://e62481f0-4630-4eaa-a790-32b7e6e49bc2.preview.emergentagent.com/api"
 
 # Admin credentials from test_credentials.md
 ADMIN_EMAIL = "admin@xamanprotocol.com"
-ADMIN_PASSWORD = "XamanAdmin2025!"
+ADMIN_PASSWORD = "admin12345"  # Default password from backend/.env
 ADMIN_PHRASE = "legal winner thank year wave sausage worth useful legal winner thank yellow"
 
 def log(msg: str):
@@ -1112,10 +1112,400 @@ class TestAdminStatsAndLastLogin:
             return False
 
 
+class TestTotalReturnModel:
+    """Test total-return model: vault rates, accrual, restake compounding, auto-restake config"""
+    def __init__(self):
+        self.admin_token = None
+        self.user_token = None
+        self.user_id = None
+        self.user_email = None
+        self.stake_id = None
+        
+    def setup_admin_token(self):
+        """Get admin token for balance adjustment"""
+        log("\n=== SETUP: Admin Login ===")
+        resp = requests.post(f"{BASE_URL}/auth/login", json={
+            "email": ADMIN_EMAIL,
+            "password": ADMIN_PASSWORD
+        })
+        assert_eq(resp.status_code, 200, "Admin login")
+        self.admin_token = resp.json()["token"]
+        log(f"✓ Admin token obtained")
+        
+    def case_1_vaults_return_total_return_rates(self):
+        """Case 1: GET /api/vaults returns total-return rates in apy field"""
+        log("\n=== CASE 1: Vaults Return Total-Return Rates ===")
+        
+        resp = requests.get(f"{BASE_URL}/vaults")
+        assert_eq(resp.status_code, 200, "GET /api/vaults returns 200")
+        data = resp.json()
+        
+        assert_in("vaults", data, "Response has vaults")
+        vaults = data["vaults"]
+        
+        # Expected rates: xrp_flex=0.1999 (18d), vip_silver=0.2999 (30d), vip_gold=0.4999 (45d), 
+        # vip_platinum=0.8999 (60d), vip_diamond=1.56 (90d)
+        expected_rates = {
+            "xrp_flex": (0.1999, 18),
+            "vip_silver": (0.2999, 30),
+            "vip_gold": (0.4999, 45),
+            "vip_platinum": (0.8999, 60),
+            "vip_diamond": (1.56, 90),
+        }
+        
+        vault_map = {v["key"]: v for v in vaults}
+        
+        for key, (expected_apy, expected_days) in expected_rates.items():
+            assert_in(key, vault_map, f"Vault {key} exists")
+            vault = vault_map[key]
+            
+            actual_apy = vault.get("apy")
+            actual_days = vault.get("duration_days")
+            
+            assert_eq(actual_apy, expected_apy, f"{key} apy")
+            assert_eq(actual_days, expected_days, f"{key} duration_days")
+            
+            log(f"✓ {key}: apy={actual_apy}, duration_days={actual_days}")
+        
+        log(f"✓ All 5 vaults have correct total-return rates")
+        
+    def case_2_register_and_fund_user(self):
+        """Case 2: Register user and admin funds balance"""
+        log("\n=== CASE 2: Register and Fund User ===")
+        
+        # Register user
+        random_suffix = secrets.token_hex(4)
+        self.user_email = f"totalreturn_{random_suffix}@example.com"
+        
+        resp = requests.post(f"{BASE_URL}/auth/register", json={
+            "first_name": "Total",
+            "last_name": "Return",
+            "email": self.user_email,
+            "password": "secret123"
+        })
+        
+        assert_eq(resp.status_code, 200, "User registration")
+        data = resp.json()
+        self.user_token = data["token"]
+        self.user_id = data["user"]["id"]
+        log(f"✓ User registered: email={self.user_email}, id={self.user_id}")
+        
+        # Admin funds user with 60000 XRP
+        resp = requests.post(
+            f"{BASE_URL}/admin/users/{self.user_id}/adjust-balance",
+            json={"amount": 60000},
+            headers={"Authorization": f"Bearer {self.admin_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "Admin balance credit")
+        log(f"✓ Balance credited: 60000 XRP")
+        
+    def case_3_open_stake_vip_silver(self):
+        """Case 3: Open stake in vip_silver (50000 XRP, 30 days, 0.2999 total return)"""
+        log("\n=== CASE 3: Open Stake in vip_silver ===")
+        
+        resp = requests.post(
+            f"{BASE_URL}/stakes",
+            json={"vault_key": "vip_silver", "amount": 50000},
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "Stake creation")
+        log(f"✓ Staked 50000 XRP into vip_silver (30 days, 0.2999 total return)")
+        
+    def case_4_verify_accrual_starts_near_zero(self):
+        """Case 4: GET /api/state immediately - verify accrued starts near 0"""
+        log("\n=== CASE 4: Verify Accrual Starts Near Zero ===")
+        
+        resp = requests.get(
+            f"{BASE_URL}/state",
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "GET /api/state")
+        data = resp.json()
+        
+        stakes = data.get("stakes", [])
+        assert_true(len(stakes) > 0, "User has at least one stake")
+        
+        # Find vip_silver stake
+        stake = None
+        for s in stakes:
+            if s.get("vault_key") == "vip_silver" and s.get("status") == "active":
+                stake = s
+                break
+        
+        assert_true(stake is not None, "Found active vip_silver stake")
+        self.stake_id = stake["id"]
+        
+        accrued = stake.get("accrued", 0)
+        principal = stake.get("principal", 0)
+        apy = stake.get("apy", 0)
+        
+        assert_eq(principal, 50000, "Principal is 50000")
+        assert_eq(apy, 0.2999, "APY is 0.2999")
+        
+        # Accrued should be very small (near 0) right after staking
+        assert_true(accrued < 1.0, f"Accrued ({accrued}) < 1.0 (near zero right after staking)")
+        log(f"✓ Accrued starts near zero: {accrued} XRP")
+        
+        return accrued
+        
+    def case_5_verify_accrual_increases(self, initial_accrued):
+        """Case 5: Wait a few seconds, GET /api/state again - verify accrued increases"""
+        log("\n=== CASE 5: Verify Accrual Increases Over Time ===")
+        
+        log("Waiting 5 seconds for accrual...")
+        time.sleep(5)
+        
+        resp = requests.get(
+            f"{BASE_URL}/state",
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "GET /api/state")
+        data = resp.json()
+        
+        stakes = data.get("stakes", [])
+        stake = None
+        for s in stakes:
+            if s["id"] == self.stake_id:
+                stake = s
+                break
+        
+        assert_true(stake is not None, "Found stake")
+        
+        new_accrued = stake.get("accrued", 0)
+        
+        # Verify accrued increased
+        assert_true(new_accrued > initial_accrued, 
+                   f"Accrued increased from {initial_accrued} to {new_accrued}")
+        log(f"✓ Accrued increased: {initial_accrued} -> {new_accrued} XRP")
+        
+        # Verify accrual calculation is in the right ballpark
+        # For 50000 at 0.2999 over 30 days, after 5 seconds:
+        # expected = 50000 * 0.2999 * (5 / (30 * 86400)) = 50000 * 0.2999 * (5 / 2592000)
+        # = 50000 * 0.2999 * 0.00000193 = 0.0289 XRP
+        expected_accrued = 50000 * 0.2999 * (5 / (30 * 86400))
+        
+        # Allow 50% tolerance due to timing variations
+        lower_bound = expected_accrued * 0.5
+        upper_bound = expected_accrued * 1.5
+        
+        assert_true(lower_bound <= new_accrued <= upper_bound,
+                   f"Accrued ({new_accrued}) is in expected range [{lower_bound:.6f}, {upper_bound:.6f}] (expected ~{expected_accrued:.6f})")
+        log(f"✓ Accrual calculation correct: {new_accrued} XRP (expected ~{expected_accrued:.6f} XRP)")
+        
+    def case_6_restake_with_stake_id(self):
+        """Case 6: POST /api/reinvest {stake_id} - verify profit compounds into stake principal"""
+        log("\n=== CASE 6: Restake Compounds Profit into Existing Stake ===")
+        
+        # Get current state
+        resp = requests.get(
+            f"{BASE_URL}/state",
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        assert_eq(resp.status_code, 200, "GET /api/state")
+        data = resp.json()
+        
+        old_profit = data.get("profit", 0)
+        
+        stakes = data.get("stakes", [])
+        stake = None
+        for s in stakes:
+            if s["id"] == self.stake_id:
+                stake = s
+                break
+        
+        old_principal = stake.get("principal", 0)
+        old_accrued = stake.get("accrued", 0)
+        
+        log(f"Before reinvest: principal={old_principal}, accrued={old_accrued}, profit={old_profit}")
+        
+        # POST /api/reinvest with stake_id
+        resp = requests.post(
+            f"{BASE_URL}/reinvest",
+            json={"stake_id": self.stake_id},
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "POST /api/reinvest returns 200")
+        reinvest_data = resp.json()
+        
+        assert_in("ok", reinvest_data, "Response has ok")
+        assert_eq(reinvest_data["ok"], True, "Response ok is true")
+        assert_in("amount", reinvest_data, "Response has amount")
+        assert_in("principal", reinvest_data, "Response has principal")
+        
+        compounded_amount = reinvest_data["amount"]
+        new_principal = reinvest_data["principal"]
+        
+        log(f"✓ Reinvest response: amount={compounded_amount}, principal={new_principal}")
+        
+        # Verify new principal = old principal + profit
+        expected_principal = old_principal + old_profit
+        # Allow small rounding difference
+        assert_true(abs(new_principal - expected_principal) < 0.01,
+                   f"New principal ({new_principal}) ≈ old principal ({old_principal}) + profit ({old_profit}) = {expected_principal}")
+        log(f"✓ Principal increased by profit: {old_principal} + {old_profit} = {new_principal}")
+        
+    def case_7_verify_restake_reset_clock(self):
+        """Case 7: GET /api/state - verify stake principal increased, accrued reset to ~0, profit ~0"""
+        log("\n=== CASE 7: Verify Restake Reset Clock ===")
+        
+        resp = requests.get(
+            f"{BASE_URL}/state",
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "GET /api/state")
+        data = resp.json()
+        
+        stakes = data.get("stakes", [])
+        stake = None
+        for s in stakes:
+            if s["id"] == self.stake_id:
+                stake = s
+                break
+        
+        assert_true(stake is not None, "Found stake")
+        
+        new_principal = stake.get("principal", 0)
+        new_accrued = stake.get("accrued", 0)
+        new_profit = data.get("profit", 0)
+        
+        # Verify principal increased (should be > 50000)
+        assert_true(new_principal > 50000, f"Principal ({new_principal}) > 50000 (original)")
+        log(f"✓ Principal increased: {new_principal} XRP")
+        
+        # Verify accrued reset to near 0
+        assert_true(new_accrued < 0.1, f"Accrued ({new_accrued}) reset to near 0")
+        log(f"✓ Accrued reset: {new_accrued} XRP")
+        
+        # Verify profit reset to near 0
+        assert_true(new_profit < 0.1, f"Profit ({new_profit}) reset to near 0")
+        log(f"✓ Profit reset: {new_profit} XRP")
+        
+        # Verify there's still only ONE stake (no new stake created)
+        vip_silver_stakes = [s for s in stakes if s.get("vault_key") == "vip_silver" and s.get("status") == "active"]
+        assert_eq(len(vip_silver_stakes), 1, "Still only ONE active vip_silver stake (no new stake created)")
+        log(f"✓ No new stake created - profit compounded into existing stake")
+        
+    def case_8_restake_invalid_stake_id(self):
+        """Case 8: POST /api/reinvest with invalid/exited stake_id -> 400/404"""
+        log("\n=== CASE 8: Restake with Invalid Stake ID ===")
+        
+        fake_stake_id = "507f1f77bcf86cd799439011"  # Valid ObjectId format but doesn't exist
+        
+        resp = requests.post(
+            f"{BASE_URL}/reinvest",
+            json={"stake_id": fake_stake_id},
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_true(resp.status_code in [400, 404], 
+                   f"Invalid stake_id returns 400/404 (got {resp.status_code})")
+        log(f"✓ Correctly rejected invalid stake_id: {resp.status_code} - {resp.json().get('detail', '')}")
+        
+    def case_9_auto_restake_config_valid(self):
+        """Case 9: POST /api/auto-restake {enabled:true, threshold:10, vault_key} -> 200 (no minimum error)"""
+        log("\n=== CASE 9: Auto-Restake Config with Valid Threshold ===")
+        
+        resp = requests.post(
+            f"{BASE_URL}/auto-restake",
+            json={"enabled": True, "threshold": 10, "vault_key": "vip_silver"},
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "POST /api/auto-restake returns 200")
+        data = resp.json()
+        
+        assert_eq(data["ok"], True, "Response ok is true")
+        assert_in("auto_restake", data, "Response has auto_restake")
+        
+        auto_restake = data["auto_restake"]
+        assert_eq(auto_restake["enabled"], True, "enabled is true")
+        assert_eq(auto_restake["threshold"], 10, "threshold is 10")
+        assert_eq(auto_restake["vault_key"], "vip_silver", "vault_key is vip_silver")
+        
+        log(f"✓ Auto-restake config saved: enabled=True, threshold=10, vault_key=vip_silver")
+        log(f"✓ NO 'threshold must be at least the vault minimum' error (validation removed)")
+        
+    def case_10_auto_restake_threshold_zero(self):
+        """Case 10: POST /api/auto-restake {enabled:true, threshold:0} -> 400"""
+        log("\n=== CASE 10: Auto-Restake with Threshold 0 ===")
+        
+        resp = requests.post(
+            f"{BASE_URL}/auto-restake",
+            json={"enabled": True, "threshold": 0},
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 400, "threshold=0 returns 400")
+        detail = resp.json().get("detail", "")
+        assert_in("greater than 0", detail.lower(), "Error message mentions 'greater than 0'")
+        log(f"✓ Correctly rejected threshold=0: {detail}")
+        
+    def case_11_auto_restake_disable(self):
+        """Case 11: POST /api/auto-restake {enabled:false} -> 200"""
+        log("\n=== CASE 11: Disable Auto-Restake ===")
+        
+        resp = requests.post(
+            f"{BASE_URL}/auto-restake",
+            json={"enabled": False},
+            headers={"Authorization": f"Bearer {self.user_token}"}
+        )
+        
+        assert_eq(resp.status_code, 200, "POST /api/auto-restake returns 200")
+        data = resp.json()
+        
+        assert_eq(data["ok"], True, "Response ok is true")
+        assert_in("auto_restake", data, "Response has auto_restake")
+        
+        auto_restake = data["auto_restake"]
+        assert_eq(auto_restake["enabled"], False, "enabled is false")
+        
+        log(f"✓ Auto-restake disabled successfully")
+        
+    def run_all_tests(self):
+        """Run all test cases"""
+        try:
+            self.setup_admin_token()
+            self.case_1_vaults_return_total_return_rates()
+            self.case_2_register_and_fund_user()
+            self.case_3_open_stake_vip_silver()
+            initial_accrued = self.case_4_verify_accrual_starts_near_zero()
+            self.case_5_verify_accrual_increases(initial_accrued)
+            self.case_6_restake_with_stake_id()
+            self.case_7_verify_restake_reset_clock()
+            self.case_8_restake_invalid_stake_id()
+            self.case_9_auto_restake_config_valid()
+            self.case_10_auto_restake_threshold_zero()
+            self.case_11_auto_restake_disable()
+            
+            log("\n" + "="*60)
+            log("✅ ALL 11 TOTAL-RETURN MODEL TEST CASES PASSED")
+            log("="*60)
+            return True
+            
+        except AssertionError as e:
+            log(f"\n❌ TEST FAILED: {e}")
+            return False
+        except Exception as e:
+            log(f"\n❌ UNEXPECTED ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+
 if __name__ == "__main__":
     import sys
     
-    if len(sys.argv) > 1 and sys.argv[1] == "flex":
+    if len(sys.argv) > 1 and sys.argv[1] == "totalreturn":
+        # Run total-return model tests
+        tester = TestTotalReturnModel()
+        success = tester.run_all_tests()
+    elif len(sys.argv) > 1 and sys.argv[1] == "flex":
         # Run flexible vault stop stake tests
         tester = TestFlexibleVaultStopStake()
         success = tester.run_all_tests()

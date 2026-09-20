@@ -424,7 +424,7 @@ function VaultsTab() {
                 <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: meta.color }} />
                 <div>
                   <p className="font-semibold text-slate-900">{v.name}</p>
-                  <p className="text-xs text-slate-400 font-mono">{(v.apy * 100).toFixed(1)}% APY · {v.duration_days ? `${v.duration_days}d lock` : "Flexible"} · Min {fmtXRP(v.min_amount, 0)} XRP</p>
+                  <p className="text-xs text-slate-400 font-mono">{(v.apy * 100).toFixed(2)}% total · {v.duration_days ? `${v.duration_days}d lock` : "Flexible"} · Min {fmtXRP(v.min_amount, 0)} XRP</p>
                 </div>
               </div>
               <div className="flex items-end gap-3 flex-wrap">

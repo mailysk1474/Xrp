@@ -21,13 +21,13 @@ const FEATURES = [
   { icon: KeyRound, title: "Self-generated wallet", text: "A fresh 12-word wallet is created for you on sign-up, encrypted on your device — you hold the keys, always." },
   { icon: Fingerprint, title: "PIN & biometric unlock", text: "Your recovery phrase is encrypted on your device behind a PIN. Daily access is a single, secure tap." },
   { icon: TrendingUp, title: "Live yield accrual", text: "Watch your profit tick up in real time across every VIP vault — second by second, never static." },
-  { icon: Layers, title: "VIP staking vaults", text: "From flexible XRP Flex to the 90-day Diamond vault at 156% APY — rewards scale with your tier." },
+  { icon: Layers, title: "VIP staking vaults", text: "From the 18-day XRP Flex vault to the 90-day Diamond vault at 156% total return — rewards scale with your tier." },
   { icon: LockKeyhole, title: "Bank-grade encryption", text: "Your keys are protected with AES-256 encryption and never leave your device in the clear." },
   { icon: Smartphone, title: "Install like an app", text: "Add XamanProtocol to your home screen and open it full-screen like a native mobile wallet." },
 ];
 
 const STATS = [
-  { value: "156%", label: "Max APY" },
+  { value: "156%", label: "Max return" },
   { value: "5", label: "VIP Vaults" },
   { value: "24/7", label: "Live Yield" },
   { value: "AES-256", label: "Encryption" },
@@ -50,7 +50,7 @@ const SECURITY = [
 const FAQS = [
   { q: "Is XamanProtocol custodial?", a: "Your 12-word phrase is your wallet identity and never leaves your device unencrypted. Staking balances are platform-managed figures, confirmed by our team when you deposit." },
   { q: "What happens if I lose my recovery phrase?", a: "There is no recovery. The phrase is the only way to access your wallet — store it offline and never share it. This is by design for a security-first, non-custodial model." },
-  { q: "How is my profit calculated?", a: "Each vault has a fixed APY. Profit accrues continuously by the second based on your staked amount and is shown live on your dashboard." },
+  { q: "How is my profit calculated?", a: "Each vault has a fixed total return that is fully paid by the end of its lock period. Profit accrues continuously by the second based on your staked amount and is shown live on your dashboard." },
   { q: "How do deposits and withdrawals work?", a: "Deposit XRP to your unique address with a destination tag; your balance is credited once the deposit is confirmed. Withdrawals are requested in-app and approved before payout." },
   { q: "Which coins are supported?", a: "XamanProtocol is XRP-first. Additional assets can be added by the protocol over time." },
   { q: "Do I need to install anything?", a: "No — it runs in your browser. For the best experience you can add it to your home screen and launch it full-screen like a native app." },
@@ -119,7 +119,7 @@ function MacMock() {
                   <div className="w-6 h-6 rounded-lg bg-purple-100 flex items-center justify-center"><Layers size={11} className="text-purple-600" /></div>
                   <div>
                     <p className="text-[10px] font-semibold text-slate-900 leading-none">VIP Diamond</p>
-                    <p className="text-[8px] text-slate-400 font-mono mt-0.5">156% APY · 90d lock</p>
+                    <p className="text-[8px] text-slate-400 font-mono mt-0.5">156% total · 90d lock</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 px-2 py-1 rounded-lg bg-blue-50 border border-blue-100">
@@ -234,7 +234,7 @@ function SlimPhone() {
                 <div className="w-5 h-5 rounded-md bg-purple-100 flex items-center justify-center"><Layers size={9} className="text-purple-600" /></div>
                 <div>
                   <p className="text-[8px] font-semibold text-slate-900 leading-none">VIP Diamond</p>
-                  <p className="text-[6px] text-slate-400 font-mono mt-0.5">156% APY</p>
+                  <p className="text-[6px] text-slate-400 font-mono mt-0.5">156% total</p>
                 </div>
               </div>
               <span className="text-[6px] px-1.5 py-0.5 rounded-full bg-blue-50 text-[#0030cf] border border-blue-200">Active</span>
@@ -297,7 +297,7 @@ const TIERS_TABLE = [
 
 const EDU = [
   { icon: Coins, title: "What is staking?", text: "Staking commits your XRP to a vault for a set period. In return the protocol pays you yield — like earning interest, but crypto-native." },
-  { icon: Percent, title: "Fixed, transparent APY", text: "Every vault shows its exact annual percentage yield up front. No hidden fees and no moving goalposts — what you see is what you earn." },
+  { icon: Percent, title: "Fixed, transparent returns", text: "Every vault shows its exact total return up front — the full profit paid by the end of the lock period. No hidden fees and no moving goalposts — what you see is what you earn." },
   { icon: Timer, title: "Continuous accrual", text: "Your profit is calculated every second against your staked amount, so your balance grows in real time — not once a month." },
   { icon: ShieldCheck, title: "Maturity & withdrawal", text: "Fixed-term vaults unlock at maturity, after which your principal and earned yield become available to withdraw." },
 ];
@@ -468,7 +468,7 @@ export default function Landing() {
           <div className="absolute -right-16 -top-16 w-72 h-72 rounded-full bg-white/10 blur-3xl" />
           <div className="relative grid lg:grid-cols-2 gap-10 items-center">
             <div>
-              <h2 className="text-3xl sm:text-4xl font-bold text-white">Up to <span className="text-cyan-200">156% APY</span> across VIP vaults.</h2>
+              <h2 className="text-3xl sm:text-4xl font-bold text-white">Up to <span className="text-cyan-200">156% total return</span> across VIP vaults.</h2>
               <p className="text-blue-100 mt-4 leading-relaxed">Tiered vaults reward commitment — from flexible XRP Flex to the 90-day Diamond vault. Your VIP tier unlocks automatically as you stake more.</p>
               <Link to="/create" className="inline-flex items-center gap-2 mt-6 bg-white text-blue-700 hover:bg-blue-50 font-semibold px-6 py-3 rounded-xl transition-all active:scale-95">
                 Start staking <ArrowRight size={16} />
